@@ -6,7 +6,7 @@ const pc = new Pinecone({
 });
 
 const openAi = new OpenAI({
-    apiKey: process.env.
+    apiKey: process.env.PINECONE_API_KEY
 })
 
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
         const embedding = embeddingResponse.data[0].embedding
 
-        const namespace = 
+        const namespace = locationId
 
         return new Response("Success", { status: 200 });
 
