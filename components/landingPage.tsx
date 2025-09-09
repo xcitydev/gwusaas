@@ -231,7 +231,7 @@ export default function LandingPage() {
         </motion.div>
 
         <nav className="hidden md:flex items-center space-x-8">
-          {["Services",  "About", "Contact"].map((item, index) => (
+          {["Services", "About", "Contact"].map((item, index) => (
             <motion.a
               key={item}
               href="#"
@@ -252,17 +252,24 @@ export default function LandingPage() {
 
         <div className="flex items-center space-x-4">
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              variant="ghost"
-              className="text-white border-white/20 hover:bg-white/10 hover:border-primary/50"
+           
+            <Link href="/dashboard"
+              className="text-white border-white/20 "
             >
               Log In
-            </Button>
+            </Link>
           </motion.div>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button className="bg-primary text-black hover:bg-primary/90 font-semibold">
-              Get Started
-            </Button>
+            <SignUpButton 
+              forceRedirectUrl={"/onboarding"}
+              fallbackRedirectUrl={"/onboarding"}
+              signInFallbackRedirectUrl={"/onboarding"}
+              signInForceRedirectUrl={"/onboarding"}
+            >
+              <Button className="bg-primary text-black hover:bg-primary/90 font-semibold">
+                Get Started
+              </Button>
+            </SignUpButton>
           </motion.div>
         </div>
       </motion.header>
@@ -309,41 +316,41 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
           >
-              <motion.div
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              >
-                <Button className="bg-primary text-black hover:bg-primary/90 px-8 py-6 text-lg rounded-full w-fit group relative overflow-hidden font-semibold shadow-lg">
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-primary/20"
-                    initial={{ x: "-100%" }}
-                    whileHover={{ x: "100%" }}
-                    transition={{ duration: 0.6 }}
-                  />
-                  <SignedOut>
-                    <SignUpButton
-                      forceRedirectUrl={"/onboarding"}
-                      fallbackRedirectUrl={"/onboarding"}
-                      signInFallbackRedirectUrl={"/onboarding"}
-                      signInForceRedirectUrl={"/onboarding"}
-                    >
-                      <span className="relative z-10 flex items-center cursor-pointer">
-                        Start Your Project
-                        <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                      </span>
-                    </SignUpButton>
-                  </SignedOut>
-                  <SignedIn>
-                    <Link href="/dashboard">
-                      <span className="relative z-10 flex items-center cursor-pointer">
-                        View Dashboard
-                        <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                      </span>
-                    </Link>
-                  </SignedIn>
-                </Button>
-              </motion.div>
+            <motion.div
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+            >
+              <Button className="bg-primary text-black hover:bg-primary/90 px-8 py-6 text-lg rounded-full w-fit group relative overflow-hidden font-semibold shadow-lg">
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-primary/20"
+                  initial={{ x: "-100%" }}
+                  whileHover={{ x: "100%" }}
+                  transition={{ duration: 0.6 }}
+                />
+                <SignedOut>
+                  <SignUpButton
+                    forceRedirectUrl={"/onboarding"}
+                    fallbackRedirectUrl={"/onboarding"}
+                    signInFallbackRedirectUrl={"/onboarding"}
+                    signInForceRedirectUrl={"/onboarding"}
+                  >
+                    <span className="relative z-10 flex items-center cursor-pointer">
+                      Start Your Project
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  </SignUpButton>
+                </SignedOut>
+                <SignedIn>
+                  <Link href="/dashboard">
+                    <span className="relative z-10 flex items-center cursor-pointer">
+                      View Dashboard
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  </Link>
+                </SignedIn>
+              </Button>
+            </motion.div>
           </motion.div>
         </motion.div>
 
