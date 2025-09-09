@@ -1,7 +1,4 @@
 "use client";
-
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import {
   Card,
   CardContent,
@@ -30,6 +27,10 @@ import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/hooks/tools/firebase";
 import Spinner from "@/components/spinner";
+import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import SideBar from "@/components/SideBar";
 
 const performanceData = [
   { month: "Jan", outreach: 2000, growth: 1200 },
@@ -75,257 +76,234 @@ const recentResponses = [
 
 export default function DashboardPage() {
   const { isLoaded, isSignedIn, user } = useUser();
-  const [isSyncing, setIsSyncing] = useState(true);
+   const router = useRouter();
+   const [goodToGo, setGoodToGo] = useState(false);
+   // Check if user exists in Convex
+   const convexUser = useQuery(
+     api.users.getUser,
+     isSignedIn ? { clerkUserId: user.id } : "skip"
+   );
 
-  useEffect(() => {
-    // Only proceed if the user is signed in and the user object is fully loaded
-    if (isLoaded && isSignedIn && user) {
-      const syncUserToFirestore = async () => {
-        try {
-          const userDocRef = doc(db, "users", user.id);
-          const docSnap = await getDoc(userDocRef);
+   useEffect(() => {
+     if (!isLoaded) return;
 
-          if (docSnap.exists()) {
-            console.log("User document already exists in Firestore.");
-            // Optional: You could update some user fields here if needed
-          } else {
-            console.log("User document not found. Creating a new one.");
-            await setDoc(userDocRef, {
-              clerkUserId: user.id,
-              email: user.emailAddresses[0].emailAddress,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              profileImageUrl: user.imageUrl,
-              createdAt: user.createdAt,
-              role: "client", // Default role
-              activeServices: [],
-              permissions: {
-                canViewDashboard: true,
-                canRequestService: true,
-              },
-            });
-            console.log("New user document created in Firestore.");
-          }
-        } catch (error) {
-          console.error("Error syncing user to Firestore:", error);
-        } finally {
-          setIsSyncing(false);
-        }
-      };
+     if (isSignedIn) {
+       if (convexUser === null) {
+         // User authenticated but doesn't exist in Convex - redirect to onboarding
+         router.push("/onboarding");
+       } else if (convexUser && !convexUser.user.onboardingCompleted) {
+         // User exists but onboarding not completed
+         router.push("/onboarding");
+       } else {
+        setGoodToGo(true);
+       }
+     }
+   }, [isLoaded, isSignedIn, convexUser, router]);
 
-      syncUserToFirestore();
-    }
-  }, [isLoaded, isSignedIn, user]);
-
-  if (!isLoaded || !isSignedIn || isSyncing) {
+  if (!isLoaded || !isSignedIn || !goodToGo) {
     // Show a loading state while syncing
-    return <Spinner />;
+     return (
+       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+       </div>
+     );
   }
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex-1 space-y-4 p-8 pt-6">
-          <div className="flex items-center justify-between space-y-2">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-              <p className="text-muted-foreground">
-                {
-                  "Welcome back! Here's an overview of your outreach performance and social growth."
-                }
+    <SideBar>
+      <div className="flex-1 space-y-4 p-8 pt-6 max-w-7xl mx-auto">
+          <div className=" space-y-4 md:mt-4 py-6">
+            <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+            <p className="text-muted-foreground">
+              {
+                "Welcome back! Here's an overview of your outreach performance and social growth."
+              }
+            </p>
+          </div>
+
+        {/* Key Metrics */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Daily Outreach
+              </CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">87</div>
+              <p className="text-xs text-muted-foreground">
+                Target: 50-100 • messages sent today
               </p>
-            </div>
-          </div>
+              <Badge variant="secondary" className="mt-1 text-green-600">
+                +12% ↗
+              </Badge>
+            </CardContent>
+          </Card>
 
-          {/* Key Metrics */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Daily Outreach
-                </CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">87</div>
-                <p className="text-xs text-muted-foreground">
-                  Target: 50-100 • messages sent today
-                </p>
-                <Badge variant="secondary" className="mt-1 text-green-600">
-                  +12% ↗
-                </Badge>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Response Rate
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">18.5%</div>
+              <p className="text-xs text-muted-foreground">from last week</p>
+              <Badge variant="secondary" className="mt-1 text-green-600">
+                +1.2% ↗
+              </Badge>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Response Rate
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">18.5%</div>
-                <p className="text-xs text-muted-foreground">from last week</p>
-                <Badge variant="secondary" className="mt-1 text-green-600">
-                  +1.2% ↗
-                </Badge>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                New Followers
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">+342</div>
+              <p className="text-xs text-muted-foreground">this week</p>
+              <Badge variant="secondary" className="mt-1 text-green-600">
+                +12% ↗
+              </Badge>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  New Followers
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">+342</div>
-                <p className="text-xs text-muted-foreground">this week</p>
-                <Badge variant="secondary" className="mt-1 text-green-600">
-                  +12% ↗
-                </Badge>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Qualified Leads
+              </CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">23</div>
+              <p className="text-xs text-muted-foreground">
+                from outreach this week
+              </p>
+              <Badge variant="secondary" className="mt-1 text-green-600">
+                +8 ↗
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Qualified Leads
-                </CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">23</div>
-                <p className="text-xs text-muted-foreground">
-                  from outreach this week
-                </p>
-                <Badge variant="secondary" className="mt-1 text-green-600">
-                  +8 ↗
-                </Badge>
-              </CardContent>
-            </Card>
-          </div>
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="outreach">Outreach</TabsTrigger>
+            <TabsTrigger value="growth">Growth</TabsTrigger>
+          </TabsList>
 
-          <Tabs defaultValue="overview" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="outreach">Outreach</TabsTrigger>
-              <TabsTrigger value="growth">Growth</TabsTrigger>
-            </TabsList>
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+              <Card className="col-span-4">
+                <CardHeader>
+                  <CardTitle>Performance Overview</CardTitle>
+                  <CardDescription>
+                    Your outreach and growth performance over the last 12 months
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pl-2">
+                  <ChartContainer
+                    config={{
+                      outreach: {
+                        label: "Outreach",
+                        color: "hsl(var(--chart-1))",
+                      },
+                      growth: {
+                        label: "Growth",
+                        color: "hsl(var(--chart-2))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={performanceData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line
+                          type="monotone"
+                          dataKey="outreach"
+                          stroke="var(--color-outreach)"
+                          strokeWidth={2}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="growth"
+                          stroke="var(--color-growth)"
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
 
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4">
-                  <CardHeader>
-                    <CardTitle>Performance Overview</CardTitle>
-                    <CardDescription>
-                      Your outreach and growth performance over the last 12
-                      months
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pl-2">
-                    <ChartContainer
-                      config={{
-                        outreach: {
-                          label: "Outreach",
-                          color: "hsl(var(--chart-1))",
-                        },
-                        growth: {
-                          label: "Growth",
-                          color: "hsl(var(--chart-2))",
-                        },
-                      }}
-                      className="h-[300px]"
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={performanceData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <ChartTooltip content={<ChartTooltipContent />} />
-                          <Line
-                            type="monotone"
-                            dataKey="outreach"
-                            stroke="var(--color-outreach)"
-                            strokeWidth={2}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="growth"
-                            stroke="var(--color-growth)"
-                            strokeWidth={2}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
-                  </CardContent>
-                </Card>
-
-                <Card className="col-span-3">
-                  <CardHeader>
-                    <CardTitle>Recent Responses</CardTitle>
-                    <CardDescription>
-                      Latest responses from your outreach campaigns
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {recentResponses.map((response, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center space-x-4"
-                        >
-                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                            <span className="text-xs font-medium">
-                              {response.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
+              <Card className="col-span-3">
+                <CardHeader>
+                  <CardTitle>Recent Responses</CardTitle>
+                  <CardDescription>
+                    Latest responses from your outreach campaigns
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {recentResponses.map((response, index) => (
+                      <div key={index} className="flex items-center space-x-4">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium">
+                            {response.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </span>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            {response.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {response.handle}
+                          </p>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline" className="text-xs">
+                              {response.platform}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {response.type}
                             </span>
                           </div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium leading-none">
-                              {response.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {response.handle}
-                            </p>
-                            <div className="flex items-center space-x-2">
-                              <Badge variant="outline" className="text-xs">
-                                {response.platform}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {response.type}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <Badge
-                              variant={
-                                response.status === "Interested"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {response.status}
-                            </Badge>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {response.time}
-                            </p>
-                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+                        <div className="text-right">
+                          <Badge
+                            variant={
+                              response.status === "Interested"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className="text-xs"
+                          >
+                            {response.status}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {response.time}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </SideBar>
   );
 }

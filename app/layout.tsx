@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import {
-  ClerkProvider,
-} from "@clerk/nextjs";
+import ConvexClientProvider from "@/components/convex/convex";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Suspense } from "react";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GWU SAAS",
-  description: "GWU SAAS",
+  title: "GWU Agency - SAAS",
+  description:
+    "Professional agency dashboard for managing GHL sub-accounts and client onboarding",
+  generator: "xcitydev",
 };
 
 export default function RootLayout({
@@ -26,14 +29,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider publishableKey="pk_test_ZmFzdC1nbG93d29ybS05NS5jbGVyay5hY2NvdW50cy5kZXYk">
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`font-sans ${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
         >
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+          <Suspense fallback={null}>
+            <ConvexClientProvider>{children}
+              <Toaster/>
+            </ConvexClientProvider>
+          </Suspense>
+        </ThemeProvider>
+        {/* <Analytics /> */}
+      </body>
+    </html>
   );
 }
