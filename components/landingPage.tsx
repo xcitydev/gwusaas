@@ -252,15 +252,14 @@ export default function LandingPage() {
 
         <div className="flex items-center space-x-4">
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-           
-            <Link href="/dashboard"
-              className="text-white border-white/20 "
-            >
-              Log In
-            </Link>
+            <SignedIn>
+              <Link href="/dashboard" className="text-white border-white/20 ">
+                Log In
+              </Link>
+            </SignedIn>
           </motion.div>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <SignUpButton 
+            <SignUpButton
               forceRedirectUrl={"/onboarding"}
               fallbackRedirectUrl={"/onboarding"}
               signInFallbackRedirectUrl={"/onboarding"}
