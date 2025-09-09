@@ -140,7 +140,7 @@ export default function OnboardingPage() {
     }
     setIsLoading(false);
     // Here you would typically send the data to your API to create the GHL sub-account
-    console.log("Creating GHL sub-account with data:", formData);
+    console.log("Creating GWU Account with data:", formData);
   };
 
   const renderStepContent = () => {
@@ -659,7 +659,7 @@ export default function OnboardingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
           >
-            Let's get your GHL sub-account set up in just a few steps
+            Let's get your GWU Account set up in just a few steps
           </motion.p>
         </div>
 
