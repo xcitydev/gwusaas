@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Download, Plus } from "lucide-react";
 import SideBar from "@/components/SideBar";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState, useEffect } from "react";
@@ -38,14 +38,21 @@ const statusColors: Record<string, string> = {
 
 export default function CRMPage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { organization } = useOrganization();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Get projects for current user
+  // Get organization
+  const convexOrg = useQuery(
+    api.organization.getByClerkId,
+    organization?.id ? { clerkOrgId: organization.id } : "skip"
+  );
+
+  // Get projects
   const projects = useQuery(
     api.projects.list,
-    {}
+    convexOrg?._id ? { organizationId: convexOrg._id } : "skip"
   );
 
   // Set first project as selected

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import SideBar from "@/components/SideBar";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
@@ -14,19 +14,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function SettingsPage() {
   const { user, isLoaded } = useUser();
+  const { organization } = useOrganization();
   const [instagramHandle, setInstagramHandle] = useState("");
   const [accessToken, setAccessToken] = useState("");
 
+  const convexOrg = useQuery(
+    api.organization.getByClerkId,
+    organization?.id ? { clerkOrgId: organization.id } : "skip"
+  );
+
   const settings = useQuery(
     api.settings.get,
-    {}
+    convexOrg?._id ? { organizationId: convexOrg._id } : "skip"
   );
 
   const setIgCreds = useMutation(api.settings.setIgCreds);
 
   const handleSaveIg = async () => {
+    if (!convexOrg?._id) {
+      toast.error("Organization not found");
+      return;
+    }
+
     try {
       await setIgCreds({
+        organizationId: convexOrg._id,
         instagramHandle: instagramHandle || undefined,
         accessToken: accessToken || undefined,
       });
@@ -50,7 +62,7 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
           <p className="text-muted-foreground">
-            Manage your account settings and integrations
+            Manage your organization settings and integrations
           </p>
         </div>
 

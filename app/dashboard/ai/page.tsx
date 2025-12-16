@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, RefreshCw, Sparkles, Lightbulb, Hash, Users, Target } from "lucide-react";
 import SideBar from "@/components/SideBar";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -29,14 +29,21 @@ const reportTypes = [
 
 export default function AIPage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { organization } = useOrganization();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("weekly_insight");
   const [generating, setGenerating] = useState<string | null>(null);
 
-  // Get projects for current user
+  // Get organization
+  const convexOrg = useQuery(
+    api.organization.getByClerkId,
+    organization?.id ? { clerkOrgId: organization.id } : "skip"
+  );
+
+  // Get projects
   const projects = useQuery(
     api.projects.list,
-    {}
+    convexOrg?._id ? { organizationId: convexOrg._id } : "skip"
   );
 
   // Set first project as selected

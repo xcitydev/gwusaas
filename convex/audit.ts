@@ -6,13 +6,15 @@ import { internalMutation } from "./_generated/server";
  */
 export const log = internalMutation({
   args: {
-    clerkUserId: v.string(),
+    organizationId: v.id("organization"),
+    actorUserId: v.string(),
     action: v.string(),
     meta: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("auditLog", {
-      clerkUserId: args.clerkUserId,
+      organizationId: args.organizationId,
+      actorUserId: args.actorUserId,
       action: args.action,
       meta: args.meta,
       createdAt: Date.now(),

@@ -1,24 +1,30 @@
 import { v } from "convex/values";
 import { query, action, internalQuery } from "./_generated/server";
-import { getCurrentUserProfile, getCurrentUserId } from "./lib/spec";
+import { getCurrentUserProfile, hasAdminRole } from "./lib/spec";
 import { internal } from "./_generated/api";
 
 /**
- * Get user KPIs (rollup across all projects)
+ * Get organization KPIs (rollup across all projects)
  */
-export const userKpis = query({
-  args: {},
+export const orgKpis = query({
+  args: {
+    organizationId: v.id("organization"),
+  },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const userId = await getCurrentUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
+    // Verify admin access
+    const profile = await getCurrentUserProfile(ctx);
+    if (!profile || !hasAdminRole(profile.role)) {
+      throw new Error("Unauthorized: Admin access required");
     }
 
-    // Get all projects for this user
+    if (profile.organizationId !== args.organizationId) {
+      throw new Error("Unauthorized: Cannot access other organization");
+    }
+
+    // Get all projects for this org
     const projects = await ctx.db
       .query("project")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", userId))
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId))
       .collect();
 
     const activeProjects = projects.filter((p) => p.status === "active");
@@ -90,19 +96,24 @@ export const userKpis = query({
  */
 export const topGrowth = query({
   args: {
+    organizationId: v.id("organization"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const userId = await getCurrentUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
+    // Verify admin access
+    const profile = await getCurrentUserProfile(ctx);
+    if (!profile || !hasAdminRole(profile.role)) {
+      throw new Error("Unauthorized: Admin access required");
     }
 
-    // Get all active projects for this user
+    if (profile.organizationId !== args.organizationId) {
+      throw new Error("Unauthorized: Cannot access other organization");
+    }
+
+    // Get all active projects
     const projects = await ctx.db
       .query("project")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", userId))
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId))
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
@@ -163,19 +174,33 @@ export const topGrowth = query({
  * Generate monthly impact report
  */
 export const monthlyReport = action({
-  args: {},
+  args: {
+    organizationId: v.id("organization"),
+  },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
+    // Verify admin access
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Unauthorized");
+    }
+
+    const profile = await ctx.runQuery(async (ctx) => {
+      return await ctx.db
+        .query("profile")
+        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
+        .filter((q) => q.eq(q.field("organizationId"), args.organizationId))
+        .first();
+    });
+
+    if (!profile || !hasAdminRole(profile.role)) {
+      throw new Error("Unauthorized: Admin access required");
     }
 
     // Get KPIs (reuse the same logic)
     const kpis = await ctx.runQuery(async (ctx) => {
       const projects = await ctx.db
         .query("project")
-        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
+        .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId))
         .collect();
 
       const activeProjects = projects.filter((p) => p.status === "active");
@@ -217,7 +242,7 @@ export const monthlyReport = action({
     const topGrowth = await ctx.runQuery(async (ctx) => {
       const projects = await ctx.db
         .query("project")
-        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
+        .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId))
         .filter((q) => q.eq(q.field("status"), "active"))
         .collect();
 

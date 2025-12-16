@@ -193,42 +193,4 @@ export default defineSchema({
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_content_type", ["contentType"])
     .index("by_status", ["status"]),
-
-  // Instagram integration
-  instagramPage: defineTable({
-    clerkUserId: v.string(),
-    pageId: v.string(), // Facebook Page ID
-    pageName: v.string(),
-    instagramBusinessAccountId: v.string(), // IG Business Account ID
-    accessToken: v.string(), // Long-lived access token
-    webhookVerified: v.boolean(),
-    webhookUrl: v.optional(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_clerk_user_id", ["clerkUserId"])
-    .index("by_page_id", ["pageId"]),
-
-  instagramDM: defineTable({
-    clerkUserId: v.string(),
-    pageId: v.string(),
-    threadId: v.string(), // Instagram conversation thread ID
-    participantId: v.string(), // Instagram user ID of the other participant
-    participantUsername: v.optional(v.string()),
-    messageId: v.string(), // Instagram message ID
-    message: v.string(),
-    from: v.string(), // "page" | "user"
-    timestamp: v.number(), // Unix timestamp
-    attachments: v.optional(v.array(v.object({
-      type: v.string(), // "image" | "video" | "audio" | "file"
-      url: v.string(),
-    }))),
-    read: v.boolean(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_clerk_user_id", ["clerkUserId"])
-    .index("by_thread_id", ["threadId"])
-    .index("by_page_id", ["pageId"])
-    .index("by_timestamp", ["timestamp"]),
 });

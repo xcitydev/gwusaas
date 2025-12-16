@@ -1,19 +1,20 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyUserAccess, getCurrentUserProfile, verifyProjectAccess } from "./lib/spec";
+import { verifyOrgAccess, getCurrentUserProfile } from "./lib/spec";
 
 /**
  * Create a new project
  */
 export const create = mutation({
   args: {
+    organizationId: v.id("organization"),
     name: v.string(),
     instagramHandle: v.string(),
     websiteUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const access = await verifyUserAccess(ctx);
+    // Verify access
+    const access = await verifyOrgAccess(ctx, args.organizationId);
     const profile = await getCurrentUserProfile(ctx);
     
     if (!profile) {
@@ -22,7 +23,7 @@ export const create = mutation({
 
     const now = Date.now();
     const projectId = await ctx.db.insert("project", {
-      clerkUserId: access.profile.clerkUserId,
+      organizationId: args.organizationId,
       name: args.name,
       instagramHandle: args.instagramHandle,
       websiteUrl: args.websiteUrl,
@@ -37,22 +38,20 @@ export const create = mutation({
 });
 
 /**
- * List projects for the current user
+ * List projects for an organization
  */
 export const list = query({
   args: {
+    organizationId: v.id("organization"),
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const userId = await ctx.auth.getUserIdentity();
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
-    }
+    // Verify access
+    await verifyOrgAccess(ctx, args.organizationId);
 
     let query = ctx.db
       .query("project")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", userId.subject));
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId));
 
     const projects = await query.collect();
 
@@ -79,7 +78,7 @@ export const get = query({
     }
 
     // Verify access
-    await verifyProjectAccess(ctx, args.projectId);
+    await verifyOrgAccess(ctx, project.organizationId);
 
     return project;
   },
@@ -97,8 +96,13 @@ export const update = mutation({
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
     // Verify access
-    await verifyProjectAccess(ctx, args.projectId);
+    await verifyOrgAccess(ctx, project.organizationId);
 
     await ctx.db.patch(args.projectId, {
       ...(args.name && { name: args.name }),

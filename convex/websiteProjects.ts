@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyUserAccess, getCurrentUserProfile, verifyWebsiteProjectAccess } from "./lib/spec";
+import { verifyOrgAccess, getCurrentUserProfile } from "./lib/spec";
 
 /**
  * Create a new website project
  */
 export const create = mutation({
   args: {
+    organizationId: v.id("organization"),
     title: v.string(),
     features: v.optional(v.string()),
     brandElements: v.optional(v.string()),
@@ -14,8 +15,8 @@ export const create = mutation({
     googleDriveLink: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const access = await verifyUserAccess(ctx);
+    // Verify access
+    const access = await verifyOrgAccess(ctx, args.organizationId);
     const profile = await getCurrentUserProfile(ctx);
     
     if (!profile) {
@@ -24,7 +25,7 @@ export const create = mutation({
 
     const now = Date.now();
     const projectId = await ctx.db.insert("websiteProject", {
-      clerkUserId: access.profile.clerkUserId,
+      organizationId: args.organizationId,
       title: args.title,
       status: "planning",
       progress: 0,
@@ -42,22 +43,20 @@ export const create = mutation({
 });
 
 /**
- * List website projects for the current user
+ * List website projects for an organization
  */
 export const list = query({
   args: {
+    organizationId: v.id("organization"),
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const userId = await ctx.auth.getUserIdentity();
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
-    }
+    // Verify access
+    await verifyOrgAccess(ctx, args.organizationId);
 
     let query = ctx.db
       .query("websiteProject")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", userId.subject));
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId));
 
     const projects = await query.collect();
 
@@ -84,7 +83,7 @@ export const get = query({
     }
 
     // Verify access
-    await verifyWebsiteProjectAccess(ctx, args.projectId);
+    await verifyOrgAccess(ctx, project.organizationId);
 
     return project;
   },
@@ -105,8 +104,13 @@ export const update = mutation({
     technologies: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
     // Verify access
-    await verifyWebsiteProjectAccess(ctx, args.projectId);
+    await verifyOrgAccess(ctx, project.organizationId);
 
     await ctx.db.patch(args.projectId, {
       ...(args.title && { title: args.title }),

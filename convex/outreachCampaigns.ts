@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyUserAccess, getCurrentUserProfile, getCurrentUserId } from "./lib/spec";
+import { verifyOrgAccess, getCurrentUserProfile } from "./lib/spec";
 
 /**
  * Create a new outreach campaign
  */
 export const create = mutation({
   args: {
+    organizationId: v.id("organization"),
     instagramUsername: v.string(),
     instagramPassword: v.optional(v.string()),
     backupCodes: v.optional(v.string()),
@@ -17,8 +18,8 @@ export const create = mutation({
     enableEngagement: v.boolean(),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const access = await verifyUserAccess(ctx);
+    // Verify access
+    const access = await verifyOrgAccess(ctx, args.organizationId);
     const profile = await getCurrentUserProfile(ctx);
     
     if (!profile) {
@@ -27,7 +28,7 @@ export const create = mutation({
 
     const now = Date.now();
     const campaignId = await ctx.db.insert("outreachCampaign", {
-      clerkUserId: access.profile.clerkUserId,
+      organizationId: args.organizationId,
       instagramUsername: args.instagramUsername,
       instagramPassword: args.instagramPassword, // TODO: Encrypt in production
       backupCodes: args.backupCodes, // TODO: Encrypt in production
@@ -47,22 +48,20 @@ export const create = mutation({
 });
 
 /**
- * List outreach campaigns for the current user
+ * List outreach campaigns for an organization
  */
 export const list = query({
   args: {
+    organizationId: v.id("organization"),
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify user is authenticated
-    const userId = await ctx.auth.getUserIdentity();
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
-    }
+    // Verify access
+    await verifyOrgAccess(ctx, args.organizationId);
 
     let query = ctx.db
       .query("outreachCampaign")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", userId.subject));
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId));
 
     const campaigns = await query.collect();
 
@@ -83,20 +82,13 @@ export const get = query({
     campaignId: v.id("outreachCampaign"),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
-    }
-
     const campaign = await ctx.db.get(args.campaignId);
     if (!campaign) {
       return null;
     }
 
-    // Verify user owns this campaign
-    if (campaign.clerkUserId !== userId) {
-      throw new Error("Unauthorized: You don't have access to this campaign");
-    }
+    // Verify access
+    await verifyOrgAccess(ctx, campaign.organizationId);
 
     return campaign;
   },
@@ -118,20 +110,13 @@ export const update = mutation({
     enableEngagement: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized: No user session");
-    }
-
     const campaign = await ctx.db.get(args.campaignId);
     if (!campaign) {
       throw new Error("Campaign not found");
     }
 
-    // Verify user owns this campaign
-    if (campaign.clerkUserId !== userId) {
-      throw new Error("Unauthorized: You don't have access to this campaign");
-    }
+    // Verify access
+    await verifyOrgAccess(ctx, campaign.organizationId);
 
     await ctx.db.patch(args.campaignId, {
       ...(args.status && { status: args.status }),
