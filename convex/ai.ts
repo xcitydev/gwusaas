@@ -5,7 +5,7 @@ import { internal } from "./_generated/api";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: "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",
+  apiKey: process.env.OPENAI_API_KEY!,
 });
 
 /**
