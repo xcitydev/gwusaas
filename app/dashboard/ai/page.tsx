@@ -49,7 +49,7 @@ export default function AIPage() {
   // Set first project as selected
   useEffect(() => {
     if (projects && projects.length > 0 && !selectedProjectId) {
-      const activeProject = projects.find((p) => p.status === "active") || projects[0];
+      const activeProject = projects.find((p: any) => p.status === "active") || projects[0];
       setSelectedProjectId(activeProject._id);
     }
   }, [projects, selectedProjectId]);
@@ -338,7 +338,7 @@ export default function AIPage() {
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map((p) => (
+                {projects.map((p: any) => (
                   <SelectItem key={p._id} value={p._id}>
                     {p.name}
                   </SelectItem>
