@@ -12,7 +12,7 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
 
   // Check if user exists in Convex
   const convexUser = useQuery(
-    api.users.getUser,
+    api.profile.getByClerkId,
     isSignedIn ? { clerkUserId: user.id } : "skip"
   );
 
@@ -23,10 +23,10 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
       if (convexUser === null) {
         // User authenticated but doesn't exist in Convex - redirect to onboarding
         return;
-      } else if (convexUser && !convexUser.user.onboardingCompleted) {
+      } else if (convexUser && !convexUser.onboardingCompleted) {
         // User exists but onboarding not completed
         router.push("/onboarding");
-      } else if (convexUser && convexUser.user.onboardingCompleted) {
+      } else if (convexUser && convexUser.onboardingCompleted) {
         // User exists and onboarding completed - redirect to dashboard
         // router.push("/dashboard");
       }
