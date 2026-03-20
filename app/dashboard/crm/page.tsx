@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import SideBar from "@/components/SideBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,294 +22,293 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Download, Plus } from "lucide-react";
-import SideBar from "@/components/SideBar";
-import { useUser, useOrganization } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useState, useEffect } from "react";
-import { useAction } from "convex/react";
+import { Search, Download, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
 
-const statusColors: Record<string, string> = {
-  new: "bg-blue-100 text-blue-800",
-  contacted: "bg-yellow-100 text-yellow-800",
-  qualified: "bg-green-100 text-green-800",
-  won: "bg-purple-100 text-purple-800",
-  lost: "bg-red-100 text-red-800",
+type GhlContact = {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  tags?: string[];
+  dateAdded?: string;
 };
 
 export default function CRMPage() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const { organization } = useOrganization();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { isLoaded, isSignedIn } = useUser();
+  const [contacts, setContacts] = useState<GhlContact[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [locationId, setLocationId] = useState("");
+  const [limit, setLimit] = useState("100");
   const [searchQuery, setSearchQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState("all");
 
-  // Get organization
-  const convexOrg = useQuery(
-    api.organization.getByClerkId,
-    organization?.id ? { clerkOrgId: organization.id } : "skip"
-  );
-
-  // Get projects
-  const projects = useQuery(
-    api.projects.list,
-    convexOrg?._id ? { organizationId: convexOrg._id } : "skip"
-  );
-
-  // Set first project as selected
-  useEffect(() => {
-    if (projects && projects.length > 0 && !selectedProjectId) {
-      const activeProject = projects.find((p) => p.status === "active") || projects[0];
-      setSelectedProjectId(activeProject._id);
-    }
-  }, [projects, selectedProjectId]);
-
-  // Get leads
-  const leadsData = useQuery(
-    api.leads.list,
-    selectedProjectId
-      ? {
-          projectId: selectedProjectId as any,
-          status: statusFilter !== "all" ? statusFilter : undefined,
-        }
-      : "skip"
-  );
-
-  const updateLead = useMutation(api.leads.update);
-  const exportCsv = useAction(api.leads.exportCsv);
-
-  // Filter leads by search query
-  const filteredLeads =
-    leadsData?.leads.filter((lead) => {
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        lead.handleOrEmail.toLowerCase().includes(query) ||
-        lead.message?.toLowerCase().includes(query) ||
-        lead.notes?.toLowerCase().includes(query)
-      );
-    }) || [];
-
-  const handleStatusChange = async (leadId: string, newStatus: string) => {
+  const fetchContacts = async () => {
+    setIsLoading(true);
+    setLastError(null);
     try {
-      await updateLead({
-        leadId: leadId as any,
-        status: newStatus,
-      });
-      toast.success("Lead status updated");
-    } catch (error: any) {
-      toast.error(`Failed to update: ${error.message}`);
+      const qs = new URLSearchParams();
+      if (locationId.trim()) {
+        qs.set("locationId", locationId.trim());
+      }
+      qs.set("limit", limit || "100");
+
+      const response = await fetch(`/api/ghl/contacts?${qs.toString()}`);
+      const payload = (await response.json()) as {
+        success?: boolean;
+        data?: GhlContact[];
+        error?: string;
+      };
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Failed to fetch GHL contacts");
+      }
+
+      setContacts(Array.isArray(payload.data) ? payload.data : []);
+      toast.success("CRM refreshed from GHL");
+    } catch (error) {
+      console.error("Failed to fetch CRM contacts", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch contacts";
+      setLastError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleExport = async () => {
-    if (!selectedProjectId) {
-      toast.error("Please select a project");
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    void fetchContacts();
+  }, [isLoaded, isSignedIn]);
+
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const contact of contacts) {
+      for (const tag of contact.tags || []) {
+        tags.add(tag);
+      }
+    }
+    return Array.from(tags).sort();
+  }, [contacts]);
+
+  const filteredContacts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return contacts.filter((contact) => {
+      if (tagFilter !== "all" && !(contact.tags || []).includes(tagFilter)) {
+        return false;
+      }
+      if (!query) return true;
+
+      const haystack = [
+        contact.firstName || "",
+        contact.lastName || "",
+        contact.email || "",
+        contact.phone || "",
+        ...(contact.tags || []),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [contacts, searchQuery, tagFilter]);
+
+  const exportCsv = () => {
+    if (filteredContacts.length === 0) {
+      toast.error("No contacts to export");
       return;
     }
 
-    try {
-      const result = await exportCsv({
-        projectId: selectedProjectId as any,
-        status: statusFilter !== "all" ? statusFilter : undefined,
-      });
+    const rows = [
+      ["id", "firstName", "lastName", "email", "phone", "tags", "dateAdded"],
+      ...filteredContacts.map((c) => [
+        c.id,
+        c.firstName || "",
+        c.lastName || "",
+        c.email || "",
+        c.phone || "",
+        (c.tags || []).join("; "),
+        c.dateAdded || "",
+      ]),
+    ];
 
-      // Download CSV
-      const csvContent = atob(result.csv);
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+    const csv = rows
+      .map((row) =>
+        row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
 
-      toast.success("CSV exported successfully");
-    } catch (error: any) {
-      toast.error(`Export failed: ${error.message}`);
-    }
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ghl-crm-contacts.csv";
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    toast.success("Contacts exported");
   };
 
   if (!isLoaded || !isSignedIn) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]" />
       </div>
     );
   }
-
-  // Calculate KPIs
-  const totalLeads = filteredLeads.length;
-  const newLeads = filteredLeads.filter((l) => l.status === "new").length;
-  const qualifiedLeads = filteredLeads.filter((l) => l.status === "qualified").length;
-  const wonLeads = filteredLeads.filter((l) => l.status === "won").length;
 
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">CRM - Leads</h2>
+            <h2 className="text-3xl font-bold tracking-tight">CRM - GHL Contacts</h2>
             <p className="text-muted-foreground">
-              Manage and track all your leads in one place
+              Manage leads pulled from your GoHighLevel account.
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            {projects && projects.length > 0 && (
-              <Select
-                value={selectedProjectId || ""}
-                onValueChange={setSelectedProjectId}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p._id} value={p._id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button variant="outline" size="sm" onClick={handleExport}>
+            <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="h-4 w-4 mr-2" />
               Export CSV
+            </Button>
+            <Button size="sm" onClick={() => void fetchContacts()} disabled={isLoading}>
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              {isLoading ? "Loading..." : "Refresh from GHL"}
             </Button>
           </div>
         </div>
 
-        {/* KPIs */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalLeads}</div>
+              <div className="text-2xl font-bold">{filteredContacts.length}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">New</CardTitle>
+              <CardTitle className="text-sm font-medium">With Email</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{newLeads}</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {filteredContacts.filter((c) => Boolean(c.email)).length}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Qualified</CardTitle>
+              <CardTitle className="text-sm font-medium">With Phone</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{qualifiedLeads}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {filteredContacts.filter((c) => Boolean(c.phone)).length}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Won</CardTitle>
+              <CardTitle className="text-sm font-medium">Tagged</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{wonLeads}</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {filteredContacts.filter((c) => (c.tags || []).length > 0).length}
+              </div>
             </CardContent>
           </Card>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Leads</CardTitle>
+            <CardTitle>All GHL Contacts</CardTitle>
             <p className="text-sm text-muted-foreground">
-              View and manage all leads for the selected project
+              Pull live contacts and filter them by tags or search text.
             </p>
+            {lastError ? (
+              <p className="text-sm text-red-400">Connection error: {lastError}</p>
+            ) : null}
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2 mb-4">
+              <Input
+                placeholder="Optional locationId override"
+                className="max-w-[260px]"
+                value={locationId}
+                onChange={(event) => setLocationId(event.target.value)}
+              />
+              <Input
+                placeholder="Limit"
+                className="max-w-[100px]"
+                value={limit}
+                onChange={(event) => setLimit(event.target.value)}
+              />
               <div className="relative flex-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search leads..."
+                  placeholder="Search contacts..."
                   className="pl-8"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by status" />
+              <Select value={tagFilter} onValueChange={setTagFilter}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Filter by tag" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="new">New</SelectItem>
-                  <SelectItem value="contacted">Contacted</SelectItem>
-                  <SelectItem value="qualified">Qualified</SelectItem>
-                  <SelectItem value="won">Won</SelectItem>
-                  <SelectItem value="lost">Lost</SelectItem>
+                  <SelectItem value="all">All Tags</SelectItem>
+                  {availableTags.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {filteredLeads.length > 0 ? (
+            {filteredContacts.length > 0 ? (
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Handle/Email</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Tags</TableHead>
+                      <TableHead>Date Added</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredLeads.map((lead) => (
-                      <TableRow key={lead._id}>
+                    {filteredContacts.map((contact) => (
+                      <TableRow key={contact.id}>
                         <TableCell className="font-medium">
-                          {lead.handleOrEmail}
+                          {[contact.firstName, contact.lastName]
+                            .filter(Boolean)
+                            .join(" ") || "-"}
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{lead.source}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {lead.message || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={lead.status}
-                            onValueChange={(newStatus) =>
-                              handleStatusChange(lead._id, newStatus)
-                            }
-                          >
-                            <SelectTrigger className="w-[130px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">New</SelectItem>
-                              <SelectItem value="contacted">Contacted</SelectItem>
-                              <SelectItem value="qualified">Qualified</SelectItem>
-                              <SelectItem value="won">Won</SelectItem>
-                              <SelectItem value="lost">Lost</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        <TableCell>{contact.email || "-"}</TableCell>
+                        <TableCell>{contact.phone || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <div className="flex flex-wrap gap-1">
+                            {(contact.tags || []).length > 0 ? (
+                              (contact.tags || []).slice(0, 3).map((tag) => (
+                                <Badge key={`${contact.id}-${tag}`} variant="secondary">
+                                  {tag}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span>-</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {new Date(lead.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              // TODO: Open notes dialog
-                              toast.info("Notes feature coming soon");
-                            }}
-                          >
-                            Notes
-                          </Button>
+                          {contact.dateAdded
+                            ? new Date(contact.dateAdded).toLocaleDateString()
+                            : "-"}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -315,11 +317,9 @@ export default function CRMPage() {
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">
-                <p>No leads found</p>
+                <p>No contacts found</p>
                 <p className="text-sm">
-                  {selectedProjectId
-                    ? "Leads will appear here as they come in"
-                    : "Please select a project"}
+                  Click &quot;Refresh from GHL&quot; to load contacts.
                 </p>
               </div>
             )}

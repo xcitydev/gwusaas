@@ -1,10 +1,13 @@
-import { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
-import { getAuth } from "@clerk/nextjs/server";
+import { QueryCtx, MutationCtx } from "../_generated/server";
+
+type DbCtx = QueryCtx | MutationCtx;
 
 /**
  * Get the current user's Clerk ID from the auth context
  */
-export async function getCurrentUserId(ctx: QueryCtx | MutationCtx | ActionCtx): Promise<string | null> {
+export async function getCurrentUserId(
+  ctx: QueryCtx | MutationCtx
+): Promise<string | null> {
   const identity = await ctx.auth.getUserIdentity();
   return identity?.subject ?? null;
 }
@@ -13,7 +16,7 @@ export async function getCurrentUserId(ctx: QueryCtx | MutationCtx | ActionCtx):
  * Get the user's profile from Convex by Clerk user ID
  */
 export async function getCurrentUserProfile(
-  ctx: QueryCtx | MutationCtx | ActionCtx
+  ctx: DbCtx
 ): Promise<{ _id: string; clerkUserId: string; role: string } | null> {
   const userId = await getCurrentUserId(ctx);
   if (!userId) return null;
@@ -36,8 +39,10 @@ export async function getCurrentUserProfile(
  * Verify user is authenticated
  */
 export async function verifyUserAccess(
-  ctx: QueryCtx | MutationCtx | ActionCtx
-): Promise<{ profile: { _id: string; clerkUserId: string; role: string } }> {
+  ctx: DbCtx
+): Promise<{
+  profile: { _id: string; clerkUserId: string; role: string };
+}> {
   const userId = await getCurrentUserId(ctx);
   if (!userId) {
     throw new Error("Unauthorized: No user session");
@@ -65,15 +70,21 @@ export async function verifyUserAccess(
  * Verify user has access to a project (must be the owner)
  */
 export async function verifyProjectAccess(
-  ctx: QueryCtx | MutationCtx | ActionCtx,
+  ctx: DbCtx,
   projectId: string
-): Promise<{ profile: { _id: string; clerkUserId: string; role: string }; project: { _id: string; clerkUserId: string } }> {
+): Promise<{
+  profile: { _id: string; clerkUserId: string; role: string };
+  project: { _id: string; clerkUserId: string };
+}> {
   const userId = await getCurrentUserId(ctx);
   if (!userId) {
     throw new Error("Unauthorized: No user session");
   }
 
-  const project = await ctx.db.get(projectId as any);
+  const project = (await ctx.db.get(projectId as any)) as {
+    _id: string;
+    clerkUserId: string;
+  } | null;
   if (!project) {
     throw new Error("Project not found");
   }
@@ -109,15 +120,21 @@ export async function verifyProjectAccess(
  * Verify user has access to a website project (must be the owner)
  */
 export async function verifyWebsiteProjectAccess(
-  ctx: QueryCtx | MutationCtx | ActionCtx,
+  ctx: DbCtx,
   projectId: string
-): Promise<{ profile: { _id: string; clerkUserId: string; role: string }; project: { _id: string; clerkUserId: string } }> {
+): Promise<{
+  profile: { _id: string; clerkUserId: string; role: string };
+  project: { _id: string; clerkUserId: string };
+}> {
   const userId = await getCurrentUserId(ctx);
   if (!userId) {
     throw new Error("Unauthorized: No user session");
   }
 
-  const project = await ctx.db.get(projectId as any);
+  const project = (await ctx.db.get(projectId as any)) as {
+    _id: string;
+    clerkUserId: string;
+  } | null;
   if (!project) {
     throw new Error("Website project not found");
   }
@@ -161,5 +178,19 @@ export function hasAdminOrManagerRole(role: string): boolean {
  */
 export function hasAdminRole(role: string): boolean {
   return role === "admin";
+}
+
+/**
+ * Backward-compatible org access helper used by legacy convex modules.
+ * Current schema is user-centric (no organization table), so this validates
+ * authenticated profile access and returns the same shape those modules expect.
+ */
+export async function verifyOrgAccess(
+  ctx: DbCtx,
+  _organizationId: unknown
+): Promise<{
+  profile: { _id: string; clerkUserId: string; role: string };
+}> {
+  return verifyUserAccess(ctx);
 }
 

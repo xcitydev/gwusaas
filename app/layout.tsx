@@ -5,6 +5,7 @@ import ConvexClientProvider from "@/components/convex/convex";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
+import { WhitelabelProvider } from "@/context/WhitelabelContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,11 +40,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Suspense fallback={null}>
-            <ConvexClientProvider>{children}
-              <Toaster/>
-            </ConvexClientProvider>
-          </Suspense>
+          <WhitelabelProvider>
+            <Suspense fallback={null}>
+              <ConvexClientProvider>{children}
+                <Toaster/>
+              </ConvexClientProvider>
+            </Suspense>
+          </WhitelabelProvider>
         </ThemeProvider>
         {/* <Analytics /> */}
       </body>

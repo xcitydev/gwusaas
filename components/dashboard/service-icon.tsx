@@ -1,0 +1,55 @@
+import {
+  Bot,
+  Briefcase,
+  Clapperboard,
+  Code2,
+  Database,
+  GraduationCap,
+  Instagram,
+  KeyRound,
+  Link,
+  Mail,
+  Megaphone,
+  MessageSquare,
+  Mic,
+  Palette,
+  Radar,
+  Search,
+  Send,
+  Share2,
+  ShieldCheck,
+  Users,
+  UsersRound,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Bot,
+  Briefcase,
+  Clapperboard,
+  Code2,
+  Database,
+  GraduationCap,
+  Instagram,
+  KeyRound,
+  Link,
+  Mail,
+  Megaphone,
+  MessageSquare,
+  Mic,
+  Palette,
+  Radar,
+  Search,
+  Send,
+  Share2,
+  ShieldCheck,
+  Users,
+  UsersRound,
+  Wrench,
+};
+
+export function ServiceIcon({ name }: { name: string }) {
+  const Icon = ICON_MAP[name] ?? Bot;
+  return <Icon className="h-5 w-5" />;
+}

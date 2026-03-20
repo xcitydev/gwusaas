@@ -1,34 +1,28 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyOrgAccess, getCurrentUserProfile } from "./lib/spec";
+import type { Id } from "./_generated/dataModel";
+import { verifyUserAccess } from "./lib/spec";
 
 /**
  * Create a new project
  */
 export const create = mutation({
   args: {
-    organizationId: v.id("organization"),
     name: v.string(),
     instagramHandle: v.string(),
     websiteUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify access
-    const access = await verifyOrgAccess(ctx, args.organizationId);
-    const profile = await getCurrentUserProfile(ctx);
-    
-    if (!profile) {
-      throw new Error("User profile not found");
-    }
+    const { profile } = await verifyUserAccess(ctx);
 
     const now = Date.now();
     const projectId = await ctx.db.insert("project", {
-      organizationId: args.organizationId,
+      clerkUserId: profile.clerkUserId,
       name: args.name,
       instagramHandle: args.instagramHandle,
       websiteUrl: args.websiteUrl,
       status: "active",
-      createdBy: profile._id,
+      createdBy: profile._id as Id<"profile">,
       createdAt: now,
       updatedAt: now,
     });
@@ -42,18 +36,16 @@ export const create = mutation({
  */
 export const list = query({
   args: {
-    organizationId: v.id("organization"),
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify access
-    await verifyOrgAccess(ctx, args.organizationId);
-
-    let query = ctx.db
+    const { profile } = await verifyUserAccess(ctx);
+    const projects = await ctx.db
       .query("project")
-      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId));
-
-    const projects = await query.collect();
+      .withIndex("by_clerk_user_id", (q) =>
+        q.eq("clerkUserId", profile.clerkUserId)
+      )
+      .collect();
 
     // Filter by status if provided
     if (args.status) {
@@ -72,13 +64,15 @@ export const get = query({
     projectId: v.id("project"),
   },
   handler: async (ctx, args) => {
+    const { profile } = await verifyUserAccess(ctx);
     const project = await ctx.db.get(args.projectId);
     if (!project) {
       return null;
     }
 
-    // Verify access
-    await verifyOrgAccess(ctx, project.organizationId);
+    if (project.clerkUserId !== profile.clerkUserId) {
+      throw new Error("Unauthorized: You don't have access to this project");
+    }
 
     return project;
   },
@@ -96,13 +90,15 @@ export const update = mutation({
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { profile } = await verifyUserAccess(ctx);
     const project = await ctx.db.get(args.projectId);
     if (!project) {
       throw new Error("Project not found");
     }
 
-    // Verify access
-    await verifyOrgAccess(ctx, project.organizationId);
+    if (project.clerkUserId !== profile.clerkUserId) {
+      throw new Error("Unauthorized: You don't have access to this project");
+    }
 
     await ctx.db.patch(args.projectId, {
       ...(args.name && { name: args.name }),

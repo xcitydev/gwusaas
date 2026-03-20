@@ -28,6 +28,7 @@ export const createOrUpdate = mutation({
     fullName: v.string(),
     email: v.string(),
     role: v.optional(v.string()), // Defaults to "client"
+    userType: v.optional(v.string()), // "client" | "agency"
   },
   handler: async (ctx, args) => {
     // Check if profile already exists
@@ -44,6 +45,7 @@ export const createOrUpdate = mutation({
         fullName: args.fullName,
         email: args.email,
         role: args.role || existing.role,
+        userType: args.userType || existing.userType || "client",
         updatedAt: now,
       });
       return existing._id;
@@ -56,6 +58,7 @@ export const createOrUpdate = mutation({
       email: args.email,
       onboardingCompleted: false,
       role: args.role || "client",
+      userType: args.userType || "client",
       createdAt: now,
       updatedAt: now,
     });

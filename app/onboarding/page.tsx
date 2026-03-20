@@ -52,28 +52,6 @@ export default function OnboardingPage() {
   const completeOnboarding = useMutation(api.onboarding.complete);
   const profile = useMutation(api.profile.completeOnboarding);
   const createProject = useMutation(api.projects.create);
-  const createOrUpdateProfile = useMutation(api.profile.createOrUpdate);
-
-  // Get user profile
-  const userProfile = useQuery(
-    api.profile.getByClerkId,
-    user?.id ? { clerkUserId: user.id } : "skip"
-  );
-
-  // Create user profile if it doesn't exist
-  useEffect(() => {
-    if (user && !userProfile) {
-      createOrUpdateProfile({
-        clerkUserId: user.id,
-        fullName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User",
-        email: user.primaryEmailAddress?.emailAddress || "",
-        role: "client",
-      }).catch((error) => {
-        console.error("Failed to create profile:", error);
-      });
-    }
-  }, [user, userProfile, createOrUpdateProfile]);
-
   useEffect(() => {
     if (existingOnboarding) {
       setFormData({
