@@ -36,7 +36,7 @@ export default function AIPage() {
 
   // Get organization
   const convexOrg = useQuery(
-    api.organization.getByClerkId,
+    api.organizations.getByClerkId,
     organization?.id ? { clerkOrgId: organization.id } : "skip"
   );
 

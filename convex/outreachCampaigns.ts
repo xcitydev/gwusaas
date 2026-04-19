@@ -1,13 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyOrgAccess, getCurrentUserProfile } from "./lib/spec";
+import { getCurrentUserProfile } from "./lib/spec";
+import { Id } from "./_generated/dataModel";
 
-/**
- * Create a new outreach campaign
- */
 export const create = mutation({
   args: {
-    organizationId: v.id("organization"),
     instagramUsername: v.string(),
     instagramPassword: v.optional(v.string()),
     backupCodes: v.optional(v.string()),
@@ -18,27 +15,25 @@ export const create = mutation({
     enableEngagement: v.boolean(),
   },
   handler: async (ctx, args) => {
-    // Verify access
-    const access = await verifyOrgAccess(ctx, args.organizationId);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
     const profile = await getCurrentUserProfile(ctx);
-    
-    if (!profile) {
-      throw new Error("User profile not found");
-    }
+    if (!profile) throw new Error("User profile not found");
 
     const now = Date.now();
     const campaignId = await ctx.db.insert("outreachCampaign", {
-      organizationId: args.organizationId,
+      clerkUserId: identity.subject,
       instagramUsername: args.instagramUsername,
-      instagramPassword: args.instagramPassword, // TODO: Encrypt in production
-      backupCodes: args.backupCodes, // TODO: Encrypt in production
+      instagramPassword: args.instagramPassword,
+      backupCodes: args.backupCodes,
       idealClient: args.idealClient,
       targetAccounts: args.targetAccounts,
       outreachScript: args.outreachScript,
       allowFollow: args.allowFollow,
       enableEngagement: args.enableEngagement,
       status: "setup",
-      createdBy: profile._id,
+      createdBy: profile._id as Id<"profile">,
       createdAt: now,
       updatedAt: now,
     });
@@ -47,56 +42,34 @@ export const create = mutation({
   },
 });
 
-/**
- * List outreach campaigns for an organization
- */
 export const list = query({
-  args: {
-    organizationId: v.id("organization"),
-    status: v.optional(v.string()),
-  },
+  args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    // Verify access
-    await verifyOrgAccess(ctx, args.organizationId);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
 
-    let query = ctx.db
+    const campaigns = await ctx.db
       .query("outreachCampaign")
-      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId));
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
+      .collect();
 
-    const campaigns = await query.collect();
-
-    // Filter by status if provided
-    if (args.status) {
-      return campaigns.filter((c) => c.status === args.status);
-    }
-
+    if (args.status) return campaigns.filter((c) => c.status === args.status);
     return campaigns;
   },
 });
 
-/**
- * Get a single outreach campaign
- */
 export const get = query({
-  args: {
-    campaignId: v.id("outreachCampaign"),
-  },
+  args: { campaignId: v.id("outreachCampaign") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
     const campaign = await ctx.db.get(args.campaignId);
-    if (!campaign) {
-      return null;
-    }
-
-    // Verify access
-    await verifyOrgAccess(ctx, campaign.organizationId);
-
+    if (!campaign || campaign.clerkUserId !== identity.subject) return null;
     return campaign;
   },
 });
 
-/**
- * Update outreach campaign
- */
 export const update = mutation({
   args: {
     campaignId: v.id("outreachCampaign"),
@@ -109,29 +82,15 @@ export const update = mutation({
     allowFollow: v.optional(v.boolean()),
     enableEngagement: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
-    const campaign = await ctx.db.get(args.campaignId);
-    if (!campaign) {
-      throw new Error("Campaign not found");
-    }
+  handler: async (ctx, { campaignId, ...patch }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
 
-    // Verify access
-    await verifyOrgAccess(ctx, campaign.organizationId);
+    const campaign = await ctx.db.get(campaignId);
+    if (!campaign || campaign.clerkUserId !== identity.subject) throw new Error("Not found");
 
-    await ctx.db.patch(args.campaignId, {
-      ...(args.status && { status: args.status }),
-      ...(args.instagramPassword !== undefined && { instagramPassword: args.instagramPassword }),
-      ...(args.backupCodes !== undefined && { backupCodes: args.backupCodes }),
-      ...(args.idealClient !== undefined && { idealClient: args.idealClient }),
-      ...(args.targetAccounts !== undefined && { targetAccounts: args.targetAccounts }),
-      ...(args.outreachScript !== undefined && { outreachScript: args.outreachScript }),
-      ...(args.allowFollow !== undefined && { allowFollow: args.allowFollow }),
-      ...(args.enableEngagement !== undefined && { enableEngagement: args.enableEngagement }),
-      updatedAt: Date.now(),
-    });
-
+    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+    await ctx.db.patch(campaignId, { ...defined, updatedAt: Date.now() });
     return { success: true };
   },
 });
-
-

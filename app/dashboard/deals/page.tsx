@@ -35,39 +35,16 @@ const stageLabel: Record<string, string> = {
   closed_lost: "Closed Lost",
 };
 
-const demoDeals = [
-  {
-    _id: "demo-deal-1",
-    stage: "replied",
-    dealValue: 1200,
-    notes: "Interested in weekly DM management.",
-    updatedAt: Date.now() - 1000 * 60 * 60 * 20,
-    isDemo: true,
-  },
-  {
-    _id: "demo-deal-2",
-    stage: "call_booked",
-    dealValue: 1800,
-    notes: "Call booked for Thursday.",
-    updatedAt: Date.now() - 1000 * 60 * 60 * 12,
-    isDemo: true,
-  },
-  {
-    _id: "demo-deal-3",
-    stage: "proposal_sent",
-    dealValue: 2500,
-    notes: "Proposal sent, waiting for approval.",
-    updatedAt: Date.now() - 1000 * 60 * 60 * 48,
-    isDemo: true,
-  },
-] as const;
-
 export default function DealsPage() {
-  const { selectedClientId } = useSelectedClient();
+  const { selectedClient } = useSelectedClient();
+  const selectedClientId = selectedClient?._id;
+
   const [values, setValues] = useState<Record<string, string>>({});
-  const updateDeal = useMutation(api.outreachWorkspace.updateDeal);
+
+  const updateDeal = useMutation(api.dealsWorkspace.updateDeal);
+
   const deals = useQuery(
-    api.outreachWorkspace.listDeals,
+    api.dealsWorkspace.listDeals,
     selectedClientId ? { clientId: selectedClientId } : "skip",
   ) as Array<{
     _id: string;
@@ -77,11 +54,6 @@ export default function DealsPage() {
     updatedAt: number;
     isDemo?: boolean;
   }> | undefined;
-
-  const mergedDeals = useMemo(() => {
-    const real = deals || [];
-    return [...real, ...demoDeals];
-  }, [deals]);
 
   const grouped = useMemo(() => {
     const map: Record<
@@ -96,18 +68,19 @@ export default function DealsPage() {
       }>
     > = {};
     for (const stage of stages) map[stage] = [];
-    for (const deal of mergedDeals) {
+    const rows = deals || [];
+    for (const deal of rows) {
       if (!map[deal.stage]) map[deal.stage] = [];
       map[deal.stage].push(deal);
     }
     return map;
-  }, [mergedDeals]);
+  }, [deals]);
 
-  const totalValue = mergedDeals.reduce((sum, deal) => sum + (deal.dealValue || 0), 0);
-  const closedWon = mergedDeals.filter((d) => d.stage === "closed_won").length;
-  const closedLost = mergedDeals.filter((d) => d.stage === "closed_lost").length;
+  const totalValue = (deals || []).reduce((sum, deal) => sum + (deal.dealValue || 0), 0);
+  const closedWon = (deals || []).filter((d) => d.stage === "closed_won").length;
+  const closedLost = (deals || []).filter((d) => d.stage === "closed_lost").length;
   const winRate = closedWon + closedLost === 0 ? 0 : Math.round((closedWon / (closedWon + closedLost)) * 100);
-  const openDeals = mergedDeals.filter((d) => !["closed_won", "closed_lost"].includes(d.stage)).length;
+  const openDeals = (deals || []).filter((d) => !["closed_won", "closed_lost"].includes(d.stage)).length;
 
   const dealLabel = (dealId: string) => {
     if (dealId.startsWith("demo-deal-")) {

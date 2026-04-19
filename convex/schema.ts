@@ -47,7 +47,10 @@ export default defineSchema({
   organizations: defineTable({
     ownerId: v.string(),
     name: v.string(),
+    plan: v.string(), // "starter" | "pro" | "agency"
+    settings: v.optional(v.any()), // IG tokens, brand colors, etc.
     createdAt: v.number(),
+    updatedAt: v.number(),
   }).index("by_owner_id", ["ownerId"]),
 
   orgClients: defineTable({
@@ -150,6 +153,7 @@ export default defineSchema({
 
   websiteProject: defineTable({
     clerkUserId: v.string(),
+    organizationId: v.optional(v.id("organizations")),
     title: v.string(),
     status: v.string(), // "planning" | "design" | "development" | "review" | "live"
     progress: v.number(), // 0-100
@@ -166,10 +170,12 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_organization_id", ["organizationId"])
     .index("by_status", ["status"]),
 
   outreachCampaign: defineTable({
     clerkUserId: v.string(),
+    organizationId: v.optional(v.id("organizations")),
     instagramUsername: v.string(),
     instagramPassword: v.optional(v.string()), // Encrypted in production
     backupCodes: v.optional(v.string()), // Encrypted in production
@@ -184,6 +190,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_organization_id", ["organizationId"])
     .index("by_status", ["status"]),
 
   dmCampaigns: defineTable({
@@ -536,4 +543,77 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_created_at", ["createdAt"]),
+
+  userApiKeys: defineTable({
+    userId: v.string(),
+    openaiApiKey: v.optional(v.string()),
+    stabilityApiKey: v.optional(v.string()),
+    replicateApiKey: v.optional(v.string()),
+    runwayApiKey: v.optional(v.string()),
+    apifyApiKey: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user_id", ["userId"]),
+
+  mediaGenerations: defineTable({
+    userId: v.string(),
+    type: v.string(), // "image" | "video"
+    provider: v.string(),
+    model: v.string(),
+    prompt: v.string(),
+    negativePrompt: v.optional(v.string()),
+    status: v.string(), // "processing" | "completed" | "failed"
+    resultUrl: v.optional(v.string()),
+    thumbnailUrl: v.optional(v.string()),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    duration: v.optional(v.number()),
+    metadata: v.optional(v.any()), // { jobId, provider } for async video
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_user_id_type", ["userId", "type"]),
+
+  approvals: defineTable({
+    organizationId: v.id("organizations"),
+    title: v.string(),
+    type: v.string(), // "Social Media" | "Content" | "Website" | "Email"
+    description: v.optional(v.string()),
+    priority: v.string(), // "Low" | "Medium" | "High"
+    status: v.string(), // "Pending Review" | "Approved" | "Rejected"
+    submittedBy: v.string(),
+    feedback: v.optional(v.string()),
+    approvedBy: v.optional(v.string()),
+    approvedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_status", ["status"]),
+
+  supportTickets: defineTable({
+    clerkUserId: v.string(),
+    subject: v.string(),
+    priority: v.string(), // "Low" | "Medium" | "High" | "Urgent"
+    category: v.string(),
+    description: v.string(),
+    status: v.string(), // "Open" | "In Progress" | "Resolved"
+    assignedTo: v.optional(v.string()),
+    lastUpdate: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_status", ["status"]),
+
+  referralProgram: defineTable({
+    clerkUserId: v.string(),
+    referralCode: v.string(),
+    totalReferrals: v.number(),
+    totalEarned: v.number(),
+    status: v.string(), // "active" | "paused"
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_referral_code", ["referralCode"]),
 });

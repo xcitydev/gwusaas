@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-export const getSavedIdeas = query({
+export const listSavedIdeas = query({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -36,7 +36,7 @@ export const saveIdea = mutation({
   },
 });
 
-export const markAddedToPipeline = mutation({
+export const markIdeaAdded = mutation({
   args: { userId: v.string(), ideaId: v.id("savedViralIdeas"), added: v.boolean() },
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.ideaId);
@@ -46,7 +46,7 @@ export const markAddedToPipeline = mutation({
   },
 });
 
-export const deleteIdea = mutation({
+export const deleteSavedIdea = mutation({
   args: { userId: v.string(), ideaId: v.id("savedViralIdeas") },
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.ideaId);

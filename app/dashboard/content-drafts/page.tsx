@@ -18,7 +18,7 @@ import SideBar from "@/components/SideBar"
 import { ContentCreationDialog } from "@/components/content-creation-dialog"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { useUser } from "@clerk/nextjs"
+import { useUser, useOrganization } from "@clerk/nextjs"
 
 const contentTemplates = [
   {

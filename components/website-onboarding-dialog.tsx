@@ -21,7 +21,6 @@ import { toast } from "sonner";
 interface WebsiteOnboardingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  organizationId: string;
   onSuccess?: () => void;
 }
 
@@ -35,7 +34,6 @@ const steps = [
 export function WebsiteOnboardingDialog({
   open,
   onOpenChange,
-  organizationId,
   onSuccess,
 }: WebsiteOnboardingDialogProps) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -75,7 +73,6 @@ export function WebsiteOnboardingDialog({
   const handleSubmit = async () => {
     try {
       await createWebsiteProject({
-        organizationId: organizationId as any,
         title: formData.title,
         features: formData.features,
         brandElements: formData.brandElements || undefined,

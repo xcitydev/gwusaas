@@ -14,72 +14,48 @@ import {
 } from "@/components/ui/table"
 import { Search, Filter, Check, X, Clock, Eye, MessageSquare } from 'lucide-react'
 import SideBar from "@/components/SideBar"
-
-const pendingApprovals = [
-  {
-    id: "APP-001",
-    title: "Instagram Campaign Creative",
-    type: "Social Media",
-    submittedBy: "Design Team",
-    submittedDate: "2024-01-08",
-    priority: "High",
-    description: "New product launch campaign visuals",
-    status: "Pending Review"
-  },
-  {
-    id: "APP-002",
-    title: "Blog Post - Industry Insights",
-    type: "Content",
-    submittedBy: "Content Team",
-    submittedDate: "2024-01-07",
-    priority: "Medium",
-    description: "Thought leadership article for website",
-    status: "Pending Review"
-  },
-  {
-    id: "APP-003",
-    title: "Website Homepage Update",
-    type: "Website",
-    submittedBy: "Dev Team",
-    submittedDate: "2024-01-06",
-    priority: "High",
-    description: "Updated hero section and CTA buttons",
-    status: "Pending Review"
-  },
-  {
-    id: "APP-004",
-    title: "Email Newsletter Template",
-    type: "Email",
-    submittedBy: "Marketing Team",
-    submittedDate: "2024-01-05",
-    priority: "Low",
-    description: "Monthly newsletter design template",
-    status: "Pending Review"
-  }
-]
-
-const approvalHistory = [
-  {
-    id: "APP-H001",
-    title: "LinkedIn Ad Campaign",
-    type: "Advertising",
-    approvedBy: "Client",
-    approvedDate: "2024-01-04",
-    status: "Approved",
-    feedback: "Looks great, proceed with launch"
-  },
-  {
-    id: "APP-H002",
-    title: "Product Demo Video",
-    type: "Video",
-    approvedBy: "Client",
-    approvedDate: "2024-01-03",
-    status: "Rejected",
-    feedback: "Please adjust the color scheme and add more product details"
-  }
-]
+import { useOrganization, useUser } from "@clerk/nextjs"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { toast } from "sonner"
+import { Id } from "@/convex/_generated/dataModel"
 
 export default function ApprovalsPage() {
+  const { organization, isLoaded: isOrgLoaded } = useOrganization()
+  const { user, isLoaded: isUserLoaded } = useUser()
+
+  const convexOrg = useQuery(
+    api.organizations.getByClerkId,
+    organization?.id ? { clerkOrgId: organization.id } : "skip"
+  )
+
+  const approvals = useQuery(
+    api.approvals.list,
+    convexOrg?._id ? { organizationId: convexOrg._id } : "skip"
+  )
+
+  const updateStatus = useMutation(api.approvals.updateStatus)
+
+  const handleUpdateStatus = async (id: Id<"approvals">, status: string) => {
+    try {
+      await updateStatus({ id, status })
+      toast.success(`Item ${status.toLowerCase()} successfully`)
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`)
+    }
+  }
+
+  if (!isOrgLoaded || !isUserLoaded || (organization && !convexOrg)) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+      </div>
+    )
+  }
+
+  const pendingApprovals = approvals?.filter(a => a.status === "Pending Review")
+  const filteredHistory = approvals?.filter(a => a.status !== "Pending Review")
+
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -87,7 +63,7 @@ export default function ApprovalsPage() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Approvals</h2>
             <p className="text-muted-foreground">
-              Review and approve content, designs, and project deliverables
+              Review and approve content, campaign designs, and website updates
             </p>
           </div>
         </div>
@@ -101,7 +77,7 @@ export default function ApprovalsPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4</div>
+              <div className="text-2xl font-bold">{pendingApprovals?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Awaiting your approval
               </p>
@@ -114,7 +90,9 @@ export default function ApprovalsPage() {
               <Check className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">18</div>
+              <div className="text-2xl font-bold">
+                {filteredHistory?.filter(a => a.status === "Approved").length || 0}
+              </div>
               <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
@@ -125,21 +103,23 @@ export default function ApprovalsPage() {
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">
+                {filteredHistory?.filter(a => a.status === "Rejected").length || 0}
+              </div>
               <p className="text-xs text-muted-foreground">Requested changes</p>
             </CardContent>
           </Card>
-
+          
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Avg. Response
+                History Total
               </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2.4h</div>
-              <p className="text-xs text-muted-foreground">Response time</p>
+              <div className="text-2xl font-bold">{filteredHistory?.length || 0}</div>
+              <p className="text-xs text-muted-foreground">Total items reviewed</p>
             </CardContent>
           </Card>
         </div>
@@ -184,62 +164,72 @@ export default function ApprovalsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pendingApprovals.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{item.title}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {item.description}
+                      {pendingApprovals && pendingApprovals.length > 0 ? (
+                        pendingApprovals.map((item) => (
+                          <TableRow key={item._id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{item.title}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {item.description}
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.type}</Badge>
-                          </TableCell>
-                          <TableCell>{item.submittedBy}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.submittedDate}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.priority === "High"
-                                  ? "destructive"
-                                  : item.priority === "Medium"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {item.priority}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-green-600"
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{item.type}</Badge>
+                            </TableCell>
+                            <TableCell>{item.submittedBy}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(item.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  item.priority === "High"
+                                    ? "destructive"
+                                    : item.priority === "Medium"
+                                    ? "default"
+                                    : "secondary"
+                                }
                               >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
+                                {item.priority}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{item.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-1">
+                                <Button variant="ghost" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  onClick={() => handleUpdateStatus(item._id, "Approved")}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleUpdateStatus(item._id, "Rejected")}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No pending approvals found.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -269,34 +259,42 @@ export default function ApprovalsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {approvalHistory.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">
-                            {item.title}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.type}</Badge>
-                          </TableCell>
-                          <TableCell>{item.approvedBy}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.approvedDate}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.status === "Approved"
-                                  ? "default"
-                                  : "destructive"
-                              }
-                            >
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {item.feedback}
+                      {filteredHistory && filteredHistory.length > 0 ? (
+                        filteredHistory.map((item) => (
+                          <TableRow key={item._id}>
+                            <TableCell className="font-medium">
+                              {item.title}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{item.type}</Badge>
+                            </TableCell>
+                            <TableCell>{item.approvedBy || "-"}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {item.approvedAt ? new Date(item.approvedAt).toLocaleDateString() : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  item.status === "Approved"
+                                    ? "default"
+                                    : "destructive"
+                                }
+                              >
+                                {item.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {item.feedback || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            No approval history found.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>

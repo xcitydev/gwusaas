@@ -32,6 +32,7 @@ export async function getCurrentUserProfile(
     _id: profile._id,
     clerkUserId: profile.clerkUserId,
     role: profile.role || "client",
+    fullName: profile.fullName || "User",
   };
 }
 

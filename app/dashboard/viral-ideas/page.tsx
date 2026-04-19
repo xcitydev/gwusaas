@@ -14,53 +14,21 @@ import { toast } from "sonner";
 const platforms = ["all", "youtube", "instagram", "tiktok", "substack", "reddit", "any"] as const;
 const categories = ["all", "client attraction", "education", "social proof", "controversy", "trend"] as const;
 
-const demoIdeas = [
-  {
-    _id: "demo-idea-1",
-    idea: "3 DM hooks that booked calls this week",
-    platform: "instagram",
-    category: "education",
-    hook: "We tested 17 DM intros. Only 3 worked.",
-    whyItWorks: "Data-backed content builds trust fast and attracts decision makers.",
-    addedToPipeline: false,
-    isDemo: true,
-  },
-  {
-    _id: "demo-idea-2",
-    idea: "The follow-up script that revived cold leads",
-    platform: "tiktok",
-    category: "client attraction",
-    hook: "Our 2nd follow-up got a 14% reply rate.",
-    whyItWorks: "Specific outcomes show practical value and drive inbound interest.",
-    addedToPipeline: true,
-    isDemo: true,
-  },
-  {
-    _id: "demo-idea-3",
-    idea: "Why most outreach fails in under 10 words",
-    platform: "youtube",
-    category: "controversy",
-    hook: "Your opening line is probably killing your deals.",
-    whyItWorks: "Contrarian framing boosts watch time and comment engagement.",
-    addedToPipeline: false,
-    isDemo: true,
-  },
-] as const;
-
 export default function ViralIdeasPage() {
   const { user } = useUser();
   const [platformFilter, setPlatformFilter] = useState<(typeof platforms)[number]>("all");
   const [categoryFilter, setCategoryFilter] = useState<(typeof categories)[number]>("all");
-  const ideas = useQuery(
-    api.viralIdeas.getSavedIdeas,
-    user?.id ? { userId: user.id } : "skip",
-  );
-  const markAdded = useMutation(api.viralIdeas.markAddedToPipeline);
-  const deleteIdea = useMutation(api.viralIdeas.deleteIdea);
+
+  const ideas = useQuery(api.viralWorkspace.listSavedIdeas, {
+    userId: user?.id || "",
+  });
+
+  const markAdded = useMutation(api.viralWorkspace.markIdeaAdded);
+  const deleteIdea = useMutation(api.viralWorkspace.deleteSavedIdea);
 
   const filtered = useMemo(() => {
-    const mergedIdeas = [...(ideas || []), ...demoIdeas];
-    return mergedIdeas.filter((item) => {
+    const rows = ideas || [];
+    return rows.filter((item) => {
       if (platformFilter !== "all" && item.platform !== platformFilter) return false;
       if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
       return true;

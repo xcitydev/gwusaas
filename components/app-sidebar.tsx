@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   ChartNoAxesColumn,
+  Clapperboard,
   ClipboardList,
   Contact,
   Files,
@@ -69,6 +70,7 @@ const agencyNav: NavSection[] = [
     items: [
       { label: "AI Services", href: "/dashboard/ai-services", icon: Bot, requiredPlan: "growth" },
       { label: "AI Studio", href: "/dashboard/ai-studio", icon: Bot, requiredPlan: "free", soon: true },
+      { label: "Media Studio", href: "/dashboard/media-studio", icon: Clapperboard, requiredPlan: "growth" },
       { label: "Content Pipeline (7 Days)", href: "/dashboard/content-pipeline", icon: CalendarDays, requiredPlan: "growth" },
       { label: "SEO Hub", href: "/dashboard/seo", icon: Sparkles, requiredPlan: "starter" },
       { label: "Lead Gen", href: "/dashboard/lead-gen", icon: Search, requiredPlan: "growth" },
@@ -109,6 +111,7 @@ const directClientNav: NavSection[] = [
     items: [
       { label: "AI Services", href: "/dashboard/ai-services", icon: Bot, requiredPlan: "growth" },
       { label: "AI Studio", href: "/dashboard/ai-studio", icon: Bot, requiredPlan: "free", soon: true },
+      { label: "Media Studio", href: "/dashboard/media-studio", icon: Clapperboard, requiredPlan: "growth" },
       { label: "Content Pipeline (7 Days)", href: "/dashboard/content-pipeline", icon: CalendarDays, requiredPlan: "growth" },
       { label: "SEO Hub", href: "/dashboard/seo", icon: Sparkles, requiredPlan: "starter" },
       { label: "Lead Gen", href: "/dashboard/lead-gen", icon: Search, requiredPlan: "growth" },

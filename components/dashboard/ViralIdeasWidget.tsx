@@ -30,14 +30,14 @@ export function ViralIdeasWidget() {
   const [platformFilter, setPlatformFilter] = useState<(typeof platforms)[number]>("all");
   const [categoryFilter, setCategoryFilter] = useState<(typeof categories)[number]>("all");
   const [loadingIndex, setLoadingIndex] = useState(0);
-  const saveIdea = useMutation(api.viralIdeas.saveIdea);
-  const markAdded = useMutation(api.viralIdeas.markAddedToPipeline);
+  const saveIdea = useMutation(api.viralWorkspace.saveIdea);
+  const markAdded = useMutation(api.viralWorkspace.markIdeaAdded);
   const config = useQuery(
     api.contentPipeline.getConfig,
     user?.id ? { userId: user.id } : "skip",
   );
   const savedIdeas = useQuery(
-    api.viralIdeas.getSavedIdeas,
+    api.viralWorkspace.listSavedIdeas,
     user?.id ? { userId: user.id } : "skip",
   );
 

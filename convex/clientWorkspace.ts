@@ -77,8 +77,10 @@ export const setUserType = mutation({
     if (args.userType === "agency" && !organizationId) {
       organizationId = await ctx.db.insert("organizations", {
         ownerId: args.clerkUserId,
-        name: args.agencyName || `${profile.fullName || "Agency"} Team`,
+        name: args.agencyName || "My Agency",
+        plan: "starter",
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
     }
 

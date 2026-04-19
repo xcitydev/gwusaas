@@ -1,13 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyOrgAccess, getCurrentUserProfile } from "./lib/spec";
+import { getCurrentUserProfile } from "./lib/spec";
+import { Id } from "./_generated/dataModel";
 
-/**
- * Create a new website project
- */
 export const create = mutation({
   args: {
-    organizationId: v.id("organization"),
     title: v.string(),
     features: v.optional(v.string()),
     brandElements: v.optional(v.string()),
@@ -15,17 +12,15 @@ export const create = mutation({
     googleDriveLink: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Verify access
-    const access = await verifyOrgAccess(ctx, args.organizationId);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
     const profile = await getCurrentUserProfile(ctx);
-    
-    if (!profile) {
-      throw new Error("User profile not found");
-    }
+    if (!profile) throw new Error("User profile not found");
 
     const now = Date.now();
     const projectId = await ctx.db.insert("websiteProject", {
-      organizationId: args.organizationId,
+      clerkUserId: identity.subject,
       title: args.title,
       status: "planning",
       progress: 0,
@@ -33,7 +28,7 @@ export const create = mutation({
       brandElements: args.brandElements,
       aboutUsSummary: args.aboutUsSummary,
       googleDriveLink: args.googleDriveLink,
-      createdBy: profile._id,
+      createdBy: profile._id as Id<"profile">,
       createdAt: now,
       updatedAt: now,
     });
@@ -42,56 +37,34 @@ export const create = mutation({
   },
 });
 
-/**
- * List website projects for an organization
- */
 export const list = query({
-  args: {
-    organizationId: v.id("organization"),
-    status: v.optional(v.string()),
-  },
+  args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    // Verify access
-    await verifyOrgAccess(ctx, args.organizationId);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
 
-    let query = ctx.db
+    const projects = await ctx.db
       .query("websiteProject")
-      .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId));
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
+      .collect();
 
-    const projects = await query.collect();
-
-    // Filter by status if provided
-    if (args.status) {
-      return projects.filter((p) => p.status === args.status);
-    }
-
+    if (args.status) return projects.filter((p) => p.status === args.status);
     return projects;
   },
 });
 
-/**
- * Get a single website project
- */
 export const get = query({
-  args: {
-    projectId: v.id("websiteProject"),
-  },
+  args: { projectId: v.id("websiteProject") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
     const project = await ctx.db.get(args.projectId);
-    if (!project) {
-      return null;
-    }
-
-    // Verify access
-    await verifyOrgAccess(ctx, project.organizationId);
-
+    if (!project || project.clerkUserId !== identity.subject) return null;
     return project;
   },
 });
 
-/**
- * Update website project
- */
 export const update = mutation({
   args: {
     projectId: v.id("websiteProject"),
@@ -103,28 +76,15 @@ export const update = mutation({
     url: v.optional(v.string()),
     technologies: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, args) => {
-    const project = await ctx.db.get(args.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
+  handler: async (ctx, { projectId, ...patch }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
 
-    // Verify access
-    await verifyOrgAccess(ctx, project.organizationId);
+    const project = await ctx.db.get(projectId);
+    if (!project || project.clerkUserId !== identity.subject) throw new Error("Not found");
 
-    await ctx.db.patch(args.projectId, {
-      ...(args.title && { title: args.title }),
-      ...(args.status && { status: args.status }),
-      ...(args.progress !== undefined && { progress: args.progress }),
-      ...(args.assignedDeveloper !== undefined && { assignedDeveloper: args.assignedDeveloper }),
-      ...(args.deadline !== undefined && { deadline: args.deadline }),
-      ...(args.url !== undefined && { url: args.url }),
-      ...(args.technologies !== undefined && { technologies: args.technologies }),
-      updatedAt: Date.now(),
-    });
-
+    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+    await ctx.db.patch(projectId, { ...defined, updatedAt: Date.now() });
     return { success: true };
   },
 });
-
-

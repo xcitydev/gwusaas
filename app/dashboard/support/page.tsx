@@ -15,36 +15,11 @@ import {
 } from "@/components/ui/table"
 import { Search, Plus, MessageCircle, Phone, Mail, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import SideBar from "@/components/SideBar"
-
-const supportTickets = [
-  {
-    id: "TICK-001",
-    subject: "Instagram campaign not showing results",
-    priority: "High",
-    status: "Open",
-    created: "2024-01-08",
-    lastUpdate: "2 hours ago",
-    assignedTo: "Support Team A"
-  },
-  {
-    id: "TICK-002",
-    subject: "Request for additional video revisions",
-    priority: "Medium",
-    status: "In Progress",
-    created: "2024-01-07",
-    lastUpdate: "1 day ago",
-    assignedTo: "Video Team"
-  },
-  {
-    id: "TICK-003",
-    subject: "Website loading speed optimization",
-    priority: "Low",
-    status: "Resolved",
-    created: "2024-01-05",
-    lastUpdate: "3 days ago",
-    assignedTo: "Tech Team"
-  }
-]
+import { useUser } from "@clerk/nextjs"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { toast } from "sonner"
+import { useState } from "react"
 
 const faqItems = [
   {
@@ -66,6 +41,59 @@ const faqItems = [
 ]
 
 export default function SupportPage() {
+  const { user, isLoaded } = useUser()
+  const tickets = useQuery(api.support.list)
+  const createTicket = useMutation(api.support.create)
+
+  const [formData, setFormData] = useState({
+    subject: "",
+    priority: "Medium",
+    category: "General Support",
+    description: ""
+  })
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmit = async () => {
+    if (!formData.subject.trim() || !formData.description.trim()) {
+      toast.error("Please fill in the subject and description")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await createTicket({
+        subject: formData.subject,
+        priority: formData.priority,
+        category: formData.category,
+        description: formData.description
+      })
+      toast.success("Support ticket created successfully!")
+      setFormData({
+        subject: "",
+        priority: "Medium",
+        category: "General Support",
+        description: ""
+      })
+    } catch (error: any) {
+      toast.error(`Failed to submit ticket: ${error.message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+      </div>
+    )
+  }
+
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -76,7 +104,7 @@ export default function SupportPage() {
               Get help with your campaigns and services
             </p>
           </div>
-          <Button>
+          <Button onClick={() => (document.querySelector('[data-value="new-ticket"]') as HTMLElement)?.click()}>
             <Plus className="h-4 w-4 mr-2" />
             New Ticket
           </Button>
@@ -91,7 +119,9 @@ export default function SupportPage() {
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">
+                {tickets?.filter(t => t.status !== "Resolved").length || 0}
+              </div>
               <p className="text-xs text-muted-foreground">Awaiting response</p>
             </CardContent>
           </Card>
@@ -102,21 +132,23 @@ export default function SupportPage() {
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">28</div>
-              <p className="text-xs text-muted-foreground">This month</p>
+              <div className="text-2xl font-bold">
+                {tickets?.filter(t => t.status === "Resolved").length || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Total resolved</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Avg. Response
+                Average Update
               </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4.2h</div>
-              <p className="text-xs text-muted-foreground">Response time</p>
+              <div className="text-2xl font-bold">-</div>
+              <p className="text-xs text-muted-foreground">Work in progress</p>
             </CardContent>
           </Card>
 
@@ -172,47 +204,55 @@ export default function SupportPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {supportTickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
-                          <TableCell className="font-medium">
-                            {ticket.id}
+                      {tickets && tickets.length > 0 ? (
+                        tickets.map((ticket) => (
+                          <TableRow key={ticket._id}>
+                            <TableCell className="font-medium">
+                              {ticket._id.slice(-8)}
+                            </TableCell>
+                            <TableCell>{ticket.subject}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  ticket.priority === "High" || ticket.priority === "Urgent"
+                                    ? "destructive"
+                                    : ticket.priority === "Medium"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {ticket.priority}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  ticket.status === "Resolved"
+                                    ? "default"
+                                    : ticket.status === "In Progress"
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                              >
+                                {ticket.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(ticket.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(ticket.lastUpdate).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>{ticket.assignedTo || "Unassigned"}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No support tickets found.
                           </TableCell>
-                          <TableCell>{ticket.subject}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                ticket.priority === "High"
-                                  ? "destructive"
-                                  : ticket.priority === "Medium"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {ticket.priority}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                ticket.status === "Resolved"
-                                  ? "default"
-                                  : ticket.status === "In Progress"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                            >
-                              {ticket.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {ticket.created}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {ticket.lastUpdate}
-                          </TableCell>
-                          <TableCell>{ticket.assignedTo}</TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -233,11 +273,19 @@ export default function SupportPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Subject</label>
-                    <Input placeholder="Brief description of your issue" />
+                    <Input 
+                      placeholder="Brief description of your issue" 
+                      value={formData.subject}
+                      onChange={(e) => handleInputChange("subject", e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Priority</label>
-                    <select className="w-full p-2 border rounded-md">
+                    <select 
+                      className="w-full p-2 border rounded-md"
+                      value={formData.priority}
+                      onChange={(e) => handleInputChange("priority", e.target.value)}
+                    >
                       <option>Low</option>
                       <option>Medium</option>
                       <option>High</option>
@@ -247,7 +295,11 @@ export default function SupportPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <select className="w-full p-2 border rounded-md">
+                  <select 
+                    className="w-full p-2 border rounded-md"
+                    value={formData.category}
+                    onChange={(e) => handleInputChange("category", e.target.value)}
+                  >
                     <option>General Support</option>
                     <option>Campaign Issues</option>
                     <option>Technical Problems</option>
@@ -260,9 +312,13 @@ export default function SupportPage() {
                   <Textarea
                     placeholder="Please provide detailed information about your issue..."
                     className="min-h-[120px]"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
                   />
                 </div>
-                <Button>Submit Ticket</Button>
+                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting ? "Submitting..." : "Submit Ticket"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

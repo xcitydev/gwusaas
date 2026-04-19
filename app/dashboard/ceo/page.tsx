@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import SideBar from "@/components/SideBar";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Download } from "lucide-react";
@@ -20,31 +20,33 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function CEOPage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded: isUserLoaded } = useUser();
+  const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const router = useRouter();
 
   const userKpis = useQuery(
     api.ceo.userKpis,
-    {}
+    organization?.id ? { organizationId: organization.id as any } : "skip"
   );
 
   const topGrowth = useQuery(
     api.ceo.topGrowth,
-    { limit: 10 }
+    organization?.id ? { organizationId: organization.id as any, limit: 10 } : "skip"
   );
 
   const monthlyReport = useAction(api.ceo.monthlyReport);
 
   const handleExportReport = async () => {
+    if (!organization?.id) return;
     try {
-      const result = await monthlyReport({});
+      const result = await monthlyReport({ organizationId: organization.id as any });
       toast.success("Monthly report generated! Check your email.");
     } catch (error: any) {
       toast.error(`Failed to generate report: ${error.message}`);
     }
   };
 
-  if (!isLoaded) {
+  if (!isUserLoaded || !isOrgLoaded) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>

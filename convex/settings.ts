@@ -8,7 +8,7 @@ import { verifyOrgAccess, hasAdminOrManagerRole } from "./lib/spec";
  */
 export const setIgCreds = mutation({
   args: {
-    organizationId: v.id("organization"),
+    organizationId: v.id("organizations"),
     instagramHandle: v.optional(v.string()),
     accessToken: v.optional(v.string()),
     metaAppId: v.optional(v.string()),
@@ -57,7 +57,7 @@ export const setIgCreds = mutation({
  */
 export const get = query({
   args: {
-    organizationId: v.id("organization"),
+    organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
     // Verify access

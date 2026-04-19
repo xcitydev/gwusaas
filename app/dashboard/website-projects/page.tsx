@@ -24,45 +24,35 @@ import {
 } from "lucide-react";
 import SideBar from "@/components/SideBar";
 import { WebsiteOnboardingDialog } from "@/components/website-onboarding-dialog";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 
 export default function WebsiteProjectsPage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Get website projects for current user
-  const websiteProjects = useQuery(
-    api.websiteProjects.list,
-    {}
-  );
+  const websiteProjects = useQuery(api.websiteProjects.list, {});
+
+  const liveSites = websiteProjects?.filter((p) => p.status === "live").length ?? 0;
+  const stats = {
+    activeProjects: websiteProjects?.filter((p) => p.status !== "live" && p.status !== "planning").length ?? 0,
+    liveSites,
+    inReview: websiteProjects?.filter((p) => p.status === "review").length ?? 0,
+    avgProgress: websiteProjects?.length
+      ? Math.round(websiteProjects.reduce((sum, p) => sum + (p.progress ?? 0), 0) / websiteProjects.length)
+      : 0,
+    mobileReady: websiteProjects?.length && liveSites > 0
+      ? Math.round((liveSites / websiteProjects.length) * 100)
+      : 0,
+  };
 
   const handleSuccess = () => {
     // Projects will automatically refresh via Convex realtime query
   };
 
-  // Calculate real stats from websiteProjects
-  const stats = websiteProjects ? {
-    activeProjects: websiteProjects.filter(p => 
-      p.status !== "live" && p.status !== "archived"
-    ).length,
-    liveSites: websiteProjects.filter(p => p.status === "live").length,
-    mobileReady: websiteProjects.length > 0 
-      ? Math.round((websiteProjects.filter(p => p.status === "live").length / websiteProjects.length) * 100)
-      : 0,
-    avgProgress: websiteProjects.length > 0
-      ? Math.round(websiteProjects.reduce((sum, p) => sum + p.progress, 0) / websiteProjects.length)
-      : 0,
-  } : {
-    activeProjects: 0,
-    liveSites: 0,
-    mobileReady: 0,
-    avgProgress: 0,
-  };
-
-  if (!isLoaded) {
+  if (!isUserLoaded) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
@@ -87,20 +77,18 @@ export default function WebsiteProjectsPage() {
               <Code className="h-4 w-4 mr-2" />
               View Code
             </Button>
-            <Button onClick={() => {setDialogOpen(true); console.log("hello")}}>
+            <Button onClick={() => {setDialogOpen(true);}}>
               <Plus className="h-4 w-4 mr-2" />
               New Project
             </Button>
           </div>
         </div>
 
-        {true&& (
-          <WebsiteOnboardingDialog
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            onSuccess={handleSuccess}
-          />
-        )}
+        <WebsiteOnboardingDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSuccess={handleSuccess}
+        />
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>

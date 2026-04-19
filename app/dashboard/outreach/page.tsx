@@ -19,39 +19,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Users, Plus } from "lucide-react";
 import { toast } from "sonner";
-
-const demoCampaigns = [
-  {
-    _id: "demo-campaign-1",
-    campaignName: "Founder outreach sprint",
-    messageType: "account_outreach",
-    status: "active",
-    totalSent: 124,
-    totalReplies: 18,
-    totalBooked: 5,
-    totalClosed: 1,
-    startedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    isDemo: true,
-  },
-  {
-    _id: "demo-campaign-2",
-    campaignName: "Follow-up recovery wave",
-    messageType: "follow_up",
-    status: "paused",
-    totalSent: 72,
-    totalReplies: 9,
-    totalBooked: 2,
-    totalClosed: 0,
-    startedAt: Date.now() - 1000 * 60 * 60 * 24 * 8,
-    isDemo: true,
-  },
-] as const;
+import { useOrganization } from "@clerk/nextjs";
 
 export default function OutreachPage() {
   const { user } = useUser();
-  const { selectedClientId, selectedClient, loading } = useSelectedClient();
+  const { organization, isLoaded: isOrgLoaded } = useOrganization();
+  const { selectedClient, loading } = useSelectedClient();
+  const selectedClientId = selectedClient?._id;
+
+  const convexOrg = useQuery(
+    api.organizations.getByClerkId,
+    organization?.id ? { clerkOrgId: organization.id } : "skip"
+  );
+
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [messageType, setMessageType] = useState<
@@ -59,6 +41,7 @@ export default function OutreachPage() {
   >("account_outreach");
   const [script, setScript] = useState("");
   const [targets, setTargets] = useState("");
+
   const createCampaign = useMutation(api.outreachWorkspace.createCampaign);
 
   const campaigns = useQuery(
@@ -79,20 +62,17 @@ export default function OutreachPage() {
     isDemo?: boolean;
   }> | undefined;
 
-  const mergedCampaigns = useMemo(() => {
-    const real = campaigns || [];
-    return [...real, ...demoCampaigns];
-  }, [campaigns]);
+  const activeCount = campaigns?.filter((c) => c.status === "active").length || 0;
 
   const stats = useMemo(() => {
-    const rows = mergedCampaigns;
+    const rows = campaigns || [];
     return {
       sent: rows.reduce((sum, c) => sum + c.totalSent, 0),
       replies: rows.reduce((sum, c) => sum + c.totalReplies, 0),
       booked: rows.reduce((sum, c) => sum + c.totalBooked, 0),
       closed: rows.reduce((sum, c) => sum + c.totalClosed, 0),
     };
-  }, [mergedCampaigns]);
+  }, [campaigns]);
 
   const onLaunch = async () => {
     if (!user?.id || !selectedClientId) return;
@@ -121,6 +101,14 @@ export default function OutreachPage() {
     }
   };
 
+  if (!isOrgLoaded || (organization && !convexOrg)) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+      </div>
+    );
+  }
+
   return (
     <SideBar>
       <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
@@ -128,22 +116,31 @@ export default function OutreachPage() {
           <div>
             <h1 className="text-3xl font-bold">Outreach & DMs</h1>
             <p className="text-muted-foreground">
-              {loading
-                ? "Loading client..."
-                : `You are tracking outreach for ${selectedClient?.clientName || "this client"}.`}
+              Manage your automated Instagram outreach and lead qualification
             </p>
           </div>
-          <Button onClick={() => setOpen(true)}>New campaign</Button>
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Campaign
+          </Button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Campaigns</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeCount}</div>
+            </CardContent>
+          </Card>
           <Card><CardHeader><CardTitle className="text-sm">DMs Sent</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{stats.sent}</p></CardContent></Card>
           <Card><CardHeader><CardTitle className="text-sm">Replies</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{stats.replies}</p></CardContent></Card>
           <Card><CardHeader><CardTitle className="text-sm">Calls Booked</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{stats.booked}</p></CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-sm">Deals Closed</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{stats.closed}</p></CardContent></Card>
         </div>
 
-        {mergedCampaigns.length === 0 ? (
+        {(!campaigns || campaigns.length === 0) ? (
           <Card className="border-dashed">
             <CardContent className="py-10 text-center">
               <MessageSquare className="mx-auto h-8 w-8 text-muted-foreground" />
@@ -158,7 +155,7 @@ export default function OutreachPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {mergedCampaigns.map((campaign) => (
+            {campaigns.map((campaign) => (
               <Card key={campaign._id}>
                 <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">

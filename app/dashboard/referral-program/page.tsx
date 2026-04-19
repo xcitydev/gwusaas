@@ -13,69 +13,36 @@ import {
 } from "@/components/ui/table"
 import { Copy, Share2, Gift, Users, DollarSign, TrendingUp, Mail, Link } from 'lucide-react'
 import SideBar from "@/components/SideBar"
-
-const referralStats = [
-  {
-    title: "Total Referrals",
-    value: "24",
-    change: "+6 this month",
-    icon: Users
-  },
-  {
-    title: "Successful Conversions",
-    value: "18",
-    change: "75% conversion rate",
-    icon: TrendingUp
-  },
-  {
-    title: "Earnings",
-    value: "$2,400",
-    change: "+$600 this month",
-    icon: DollarSign
-  },
-  {
-    title: "Pending Rewards",
-    value: "$450",
-    change: "3 pending payouts",
-    icon: Gift
-  }
-]
-
-const referralHistory = [
-  {
-    id: "REF-001",
-    referredName: "John Smith",
-    referredEmail: "john@example.com",
-    status: "Converted",
-    signupDate: "2024-01-05",
-    conversionDate: "2024-01-08",
-    reward: "$150",
-    service: "Social Media Management"
-  },
-  {
-    id: "REF-002",
-    referredName: "Sarah Johnson",
-    referredEmail: "sarah@company.com",
-    status: "Pending",
-    signupDate: "2024-01-07",
-    conversionDate: "-",
-    reward: "$0",
-    service: "Website Development"
-  },
-  {
-    id: "REF-003",
-    referredName: "Mike Chen",
-    referredEmail: "mike@startup.io",
-    status: "Converted",
-    signupDate: "2024-01-03",
-    conversionDate: "2024-01-06",
-    reward: "$200",
-    service: "Video Production"
-  }
-]
+import { useUser } from "@clerk/nextjs"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { useEffect } from "react"
+import { toast } from "sonner"
 
 export default function ReferralProgramPage() {
-  const referralLink = "https://agency.com/ref/client123"
+  const { user, isLoaded } = useUser()
+  const referralData = useQuery(api.referrals.get)
+  const initReferral = useMutation(api.referrals.init)
+
+  useEffect(() => {
+    if (isLoaded && user && !referralData) {
+      initReferral().catch(err => {
+        console.error("Failed to init referral program:", err)
+      })
+    }
+  }, [isLoaded, user, referralData, initReferral])
+
+  const referralLink = referralData 
+    ? `https://agency.com/ref/${referralData.referralCode}`
+    : "Loading..."
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+      </div>
+    )
+  }
 
   return (
     <SideBar>
@@ -89,27 +56,63 @@ export default function ReferralProgramPage() {
               Earn rewards by referring new clients to our services
             </p>
           </div>
-          <Button>
+          <Button onClick={() => {
+            navigator.clipboard.writeText(referralLink)
+            toast.success("Referral link copied!")
+          }}>
             <Share2 className="h-4 w-4 mr-2" />
             Share Link
           </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {referralStats.map((stat, index) => (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">{stat.change}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Referrals
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{referralData?.totalReferrals || 0}</div>
+              <p className="text-xs text-muted-foreground">Across all time</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Earnings</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold overflow-hidden text-ellipsis">
+                ${referralData?.totalEarned.toLocaleString() || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Total paid out</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Status</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold capitalize">{referralData?.status || "Loading..."}</div>
+              <p className="text-xs text-muted-foreground">Program status</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Code</CardTitle>
+              <Gift className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold truncate">{referralData?.referralCode || "---"}</div>
+              <p className="text-xs text-muted-foreground">Your unique ID</p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -125,7 +128,10 @@ export default function ReferralProgramPage() {
                 <Input value={referralLink} readOnly />
                 <Button
                   size="sm"
-                  onClick={() => navigator.clipboard.writeText(referralLink)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(referralLink)
+                    toast.success("Link copied!")
+                  }}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -136,7 +142,7 @@ export default function ReferralProgramPage() {
                   Email
                 </Button>
                 <Button variant="outline" size="sm">
-                  <Link className="h-4 w-4 mr-2" />
+                  <Share2 className="h-4 w-4 mr-2" />
                   Social Media
                 </Button>
               </div>
@@ -194,32 +200,12 @@ export default function ReferralProgramPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {referralHistory.map((referral) => (
-                    <TableRow key={referral.id}>
-                      <TableCell className="font-medium">
-                        {referral.referredName}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {referral.referredEmail}
-                      </TableCell>
-                      <TableCell>{referral.service}</TableCell>
-                      <TableCell>{referral.signupDate}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            referral.status === "Converted"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {referral.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {referral.reward}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {/* History table would be populated from a separate join table in the future */}
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No referrals found yet. Share your link to get started!
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </div>
