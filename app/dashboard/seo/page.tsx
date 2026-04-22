@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import SideBar from "@/components/SideBar";
 import { PlanGate } from "@/components/PlanGate";
 import { Button } from "@/components/ui/button";
@@ -95,50 +95,439 @@ function normalizeAuditUrl(input: string) {
   return `https://${raw}`;
 }
 
-function renderAuditValue(value: unknown): React.ReactNode {
-  if (value === null || value === undefined) {
-    return <p className="text-sm text-muted-foreground">No data</p>;
-  }
+type AuditSection = {
+  present?: boolean;
+  content?: string;
+  length?: number;
+  issues?: string[];
+  recommendations?: string[];
+  score?: number;
+};
 
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return <p className="text-sm text-muted-foreground">No items</p>;
+function snakeToTitleCase(key: string): string {
+  return key
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getScoreStatus(score: number): {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+} {
+  if (score <= 0) {
+    return {
+      label: "Critical",
+      color: "#ef4444",
+      bg: "rgba(239, 68, 68, 0.12)",
+      border: "rgba(239, 68, 68, 0.35)",
+    };
+  }
+  if (score < 8) {
+    return {
+      label: "Needs Work",
+      color: "#eab308",
+      bg: "rgba(234, 179, 8, 0.12)",
+      border: "rgba(234, 179, 8, 0.35)",
+    };
+  }
+  return {
+    label: "Good",
+    color: "#22c55e",
+    bg: "rgba(34, 197, 94, 0.12)",
+    border: "rgba(34, 197, 94, 0.35)",
+  };
+}
+
+function isAuditSection(value: unknown): value is AuditSection {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "score" in (value as Record<string, unknown>) &&
+    typeof (value as Record<string, unknown>).score === "number"
+  );
+}
+
+function computeOverallScore(result: JsonObject): number {
+  const scores: number[] = [];
+  for (const value of Object.values(result)) {
+    if (isAuditSection(value) && typeof value.score === "number") {
+      scores.push(value.score);
     }
-    return (
-      <div className="space-y-1 text-sm">
-        {value.map((item, idx) => (
-          <div key={`arr-${idx}`} className="whitespace-pre-wrap break-words">
-            - {typeof item === "object" && item !== null ? JSON.stringify(item, null, 2) : String(item)}
-          </div>
-        ))}
-      </div>
-    );
   }
+  if (scores.length === 0) return 0;
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return Math.round(avg * 10);
+}
 
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) {
-      return <p className="text-sm text-muted-foreground">No fields</p>;
+function getOverallColor(score: number): string {
+  if (score < 40) return "#ef4444";
+  if (score < 75) return "#eab308";
+  return "#22c55e";
+}
+
+type Html2PdfInstance = {
+  set: (opts: Record<string, unknown>) => Html2PdfInstance;
+  from: (el: HTMLElement) => Html2PdfInstance;
+  save: () => Promise<void>;
+};
+
+function loadHtml2Pdf(): Promise<() => Html2PdfInstance> {
+  return new Promise((resolve, reject) => {
+    const w = window as unknown as { html2pdf?: () => Html2PdfInstance };
+    if (w.html2pdf) {
+      resolve(w.html2pdf);
+      return;
     }
-    return (
-      <div className="space-y-2 text-sm">
-        {entries.map(([subKey, subValue]) => (
-          <div key={subKey} className="rounded-md border border-border/60 p-2">
-            <p className="font-medium capitalize">
-              {subKey.replace(/([A-Z])/g, " $1").trim()}
-            </p>
-            <p className="mt-1 whitespace-pre-wrap break-words">
-              {typeof subValue === "object" && subValue !== null
-                ? JSON.stringify(subValue, null, 2)
-                : String(subValue)}
-            </p>
-          </div>
-        ))}
-      </div>
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-html2pdf="true"]',
     );
-  }
+    if (existing) {
+      existing.addEventListener("load", () => {
+        if (w.html2pdf) resolve(w.html2pdf);
+        else reject(new Error("html2pdf failed to initialize"));
+      });
+      existing.addEventListener("error", () => reject(new Error("html2pdf failed to load")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.async = true;
+    script.dataset.html2pdf = "true";
+    script.onload = () => {
+      if (w.html2pdf) resolve(w.html2pdf);
+      else reject(new Error("html2pdf failed to initialize"));
+    };
+    script.onerror = () => reject(new Error("html2pdf failed to load"));
+    document.body.appendChild(script);
+  });
+}
 
-  return <p className="text-sm whitespace-pre-wrap break-words">{String(value)}</p>;
+function CircularScore({ score, color }: { score: number; color: string }) {
+  const size = 132;
+  const stroke = 10;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.max(0, Math.min(100, score));
+  const offset = circumference - (pct / 100) * circumference;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={stroke}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 900ms ease-out" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-bold tracking-tight" style={{ color }}>
+          {score}
+        </span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          out of 100
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AuditSectionCard({
+  sectionKey,
+  section,
+}: {
+  sectionKey: string;
+  section: AuditSection;
+}) {
+  const score = typeof section.score === "number" ? section.score : 0;
+  const status = getScoreStatus(score);
+  const title = snakeToTitleCase(sectionKey);
+  const issues = Array.isArray(section.issues) ? section.issues : [];
+  const recommendations = Array.isArray(section.recommendations)
+    ? section.recommendations
+    : [];
+  const hasContent =
+    typeof section.content === "string" && section.content.trim().length > 0;
+
+  return (
+    <div
+      className="rounded-[12px] border bg-card/60 p-5 shadow-sm transition-colors hover:border-amber-500/30"
+      style={{
+        borderColor: "rgba(255,255,255,0.08)",
+        backgroundColor: "rgba(255,255,255,0.02)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold leading-tight">{title}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+              style={{
+                color: status.color,
+                backgroundColor: status.bg,
+                border: `1px solid ${status.border}`,
+              }}
+            >
+              {status.label}
+            </span>
+            {typeof section.length === "number" ? (
+              <span className="text-[11px] text-muted-foreground">
+                {section.length} chars
+              </span>
+            ) : null}
+            {section.present === false ? (
+              <span className="text-[11px] text-muted-foreground">missing</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-2xl font-bold leading-none" style={{ color: status.color }}>
+            {score}
+          </div>
+          <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            / 10
+          </div>
+        </div>
+      </div>
+
+      {hasContent ? (
+        <div className="mt-3">
+          <code className="inline-block max-w-full truncate rounded-md border border-white/5 bg-black/30 px-2 py-1 font-mono text-[11px] text-muted-foreground">
+            {section.content}
+          </code>
+        </div>
+      ) : null}
+
+      {issues.length > 0 ? (
+        <div className="mt-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Issues
+          </p>
+          <ul className="space-y-1.5">
+            {issues.map((issue, idx) => (
+              <li
+                key={`issue-${idx}`}
+                className="flex gap-2 text-sm leading-snug text-foreground/90"
+              >
+                <span aria-hidden className="select-none">❌</span>
+                <span className="min-w-0 break-words">{issue}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {recommendations.length > 0 ? (
+        <div className="mt-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Recommendations
+          </p>
+          <ul className="space-y-1.5">
+            {recommendations.map((rec, idx) => (
+              <li
+                key={`rec-${idx}`}
+                className="flex gap-2 text-sm leading-snug text-foreground/90"
+              >
+                <span aria-hidden className="select-none">💡</span>
+                <span className="min-w-0 break-words">{rec}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {issues.length === 0 && recommendations.length === 0 && !hasContent ? (
+        <p className="mt-4 text-sm text-muted-foreground">No additional details.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function AuditResultsDashboard({
+  result,
+  auditUrl,
+}: {
+  result: JsonObject;
+  auditUrl: string;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const sectionEntries = Object.entries(result).filter(([, value]) =>
+    isAuditSection(value),
+  ) as [string, AuditSection][];
+
+  const overall = computeOverallScore(result);
+  const overallColor = getOverallColor(overall);
+
+  const handleExportJson = () => {
+    try {
+      const blob = new Blob([JSON.stringify(result, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug =
+        auditUrl
+          .replace(/^https?:\/\//i, "")
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "")
+          .toLowerCase() || "seo-audit";
+      a.download = `${slug}-seo-audit.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export JSON", err);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!containerRef.current) return;
+    setExporting(true);
+    try {
+      const html2pdf = await loadHtml2Pdf();
+      const slug =
+        auditUrl
+          .replace(/^https?:\/\//i, "")
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "")
+          .toLowerCase() || "seo-audit";
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: `${slug}-seo-audit.pdf`,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: {
+            scale: 2,
+            backgroundColor: "#0a0a0a",
+            useCORS: true,
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        })
+        .from(containerRef.current)
+        .save();
+    } catch (err) {
+      console.error("Failed to export PDF", err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 space-y-5"
+    >
+      <div
+        className="rounded-[12px] border p-5 md:p-6"
+        style={{
+          borderColor: "rgba(255,255,255,0.08)",
+          backgroundColor: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-5">
+            <CircularScore score={overall} color={overallColor} />
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-amber-400/90">
+                Overall
+              </p>
+              <h2 className="text-2xl font-bold leading-tight">
+                SEO Performance Score
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Averaged across {sectionEntries.length} audited{" "}
+                {sectionEntries.length === 1 ? "section" : "sections"}
+                {auditUrl ? (
+                  <>
+                    {" "}· <span className="text-foreground/80">{auditUrl}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+          </div>
+          <div
+            className="flex flex-wrap gap-2"
+            data-html2canvas-ignore="true"
+          >
+            <Button
+              onClick={handleExportJson}
+              variant="outline"
+              className="border-amber-500/30 bg-transparent text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+            >
+              Export JSON
+            </Button>
+            <Button
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="bg-amber-500 text-black hover:bg-amber-400"
+            >
+              {exporting ? "Exporting…" : "Export PDF"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+            <div
+              className="h-full rounded-full transition-all duration-700 ease-out"
+              style={{
+                width: `${overall}%`,
+                backgroundColor: overallColor,
+              }}
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span>0</span>
+            <span>50</span>
+            <span>100</span>
+          </div>
+        </div>
+      </div>
+
+      {sectionEntries.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {sectionEntries.map(([key, section]) => (
+            <AuditSectionCard key={key} sectionKey={key} section={section} />
+          ))}
+        </div>
+      ) : (
+        <div
+          className="rounded-[12px] border p-5 text-sm text-muted-foreground"
+          style={{
+            borderColor: "rgba(255,255,255,0.08)",
+            backgroundColor: "rgba(255,255,255,0.02)",
+          }}
+        >
+          The audit response did not contain any scored sections.
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SeoHubPage() {
@@ -296,20 +685,7 @@ export default function SeoHubPage() {
                     <p className="text-sm text-muted-foreground">Empty state: no audit result yet.</p>
                   ) : null}
                   {auditResult ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {Object.entries(auditResult).map(([key, value]) => (
-                        <Card key={key}>
-                          <CardHeader>
-                            <CardTitle className="text-base capitalize">
-                              {key.replace(/([A-Z])/g, " $1").trim()}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderAuditValue(value)}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                    <AuditResultsDashboard result={auditResult} auditUrl={auditUrl} />
                   ) : null}
                   {auditRaw && !auditResult ? (
                     <pre className="text-xs whitespace-pre-wrap rounded-md border p-4 overflow-x-auto">

@@ -1,0 +1,7 @@
+{
+  "projectId": "ea37ac81-e422-4d73-90e7-896eaffebfee",
+  "createdAt": 1774856653120,
+  "version": "1.0",
+  "startupCommands": ["pnpm install; ./node_modules/.bin/next dev --turbopack"],
+  "templateId": "any"
+}

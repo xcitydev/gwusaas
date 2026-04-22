@@ -13,7 +13,7 @@ export default function AdvertisingHubPage() {
     <SideBar>
       <div className="mx-auto w-full max-w-7xl p-6 md:p-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Advertising Hub</h1>
+          <h1 className="text-3xl font-bold">Advertising Hu/
           <p className="text-muted-foreground">
             Manage outbound and paid acquisition services.
           </p>
