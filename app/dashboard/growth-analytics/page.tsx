@@ -7,16 +7,29 @@ import { Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } fro
 import { Users, Heart, TrendingUp, Eye } from 'lucide-react'
 import SideBar from "@/components/SideBar"
 
-const followerGrowthData = [
-  { month: "Jan", followers: 8500, engagement: 12000 },
-  { month: "Feb", followers: 9200, engagement: 13500 },
-  { month: "Mar", followers: 10100, engagement: 15200 },
-  { month: "Apr", followers: 11300, engagement: 17800 },
-  { month: "May", followers: 12100, engagement: 19500 },
-  { month: "Jun", followers: 12847, engagement: 21200 },
-]
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function GrowthAnalyticsPage() {
+  const followerGrowthData = useQuery(api.analytics.getFollowerGrowth) || [];
+  
+  if (!followerGrowthData.length) {
+    return (
+      <SideBar>
+        <div className="p-8 space-y-4">
+          <Skeleton className="h-10 w-48" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </SideBar>
+    );
+  }
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6">

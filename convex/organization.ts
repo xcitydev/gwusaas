@@ -35,10 +35,12 @@ export const createDefault = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const trialDurationMs = 14 * 24 * 60 * 60 * 1000; // 14 days
     return await ctx.db.insert("organizations", {
       ownerId: args.ownerId,
       name: args.name,
-      plan: "starter",
+      plan: "growth", // Start them on growth plan for the trial
+      trialEndsAt: now + trialDurationMs,
       settings: {},
       createdAt: now,
       updatedAt: now,

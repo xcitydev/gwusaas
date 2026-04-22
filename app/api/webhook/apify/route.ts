@@ -1,24 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import crypto from "crypto";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * Apify Webhook Receiver
- * Expected payload (customized via Apify 'on finish' webhook):
- * {
- *   "clerkUserId": "user_...",
- *   "clientId": "...",
- *   "sourceAccount": "@username",
- *   "results": [...]
- * }
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    console.log("Apify Webhook Received:", body);
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-apify-webhook-signature");
+    const secret = process.env.APIFY_WEBHOOK_SECRET;
 
+    // Verify signature in production
+    if (process.env.NODE_ENV === "production") {
+      if (!signature || !secret) {
+        return NextResponse.json({ error: "Missing signature or secret" }, { status: 401 });
+      }
+
+      const hmac = crypto.createHmac("sha256", secret);
+      hmac.update(rawBody);
+      const expectedSignature = hmac.digest("base64");
+
+      if (signature !== expectedSignature) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
+    }
+
+    const body = JSON.parse(rawBody);
     const { clerkUserId, clientId, sourceAccount, results } = body;
 
     if (!clerkUserId || !clientId || !results || !Array.isArray(results)) {

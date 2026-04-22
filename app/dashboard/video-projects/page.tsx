@@ -15,54 +15,36 @@ import {
 import { Search, Filter, Plus, Play, Download, Upload, Clock, User } from 'lucide-react'
 import SideBar from "@/components/SideBar"
 
-const videoProjects = [
-  {
-    id: "VID-001",
-    title: "Product Demo Video",
-    client: "TechCorp",
-    duration: "2:45",
-    status: "In Production",
-    progress: 75,
-    deadline: "2024-01-15",
-    editor: "Sarah Johnson",
-    thumbnail: "/placeholder.svg?height=60&width=100"
-  },
-  {
-    id: "VID-002",
-    title: "Brand Story Documentary",
-    client: "StartupXYZ",
-    duration: "5:30",
-    status: "Review",
-    progress: 90,
-    deadline: "2024-01-20",
-    editor: "Mike Chen",
-    thumbnail: "/placeholder.svg?height=60&width=100"
-  },
-  {
-    id: "VID-003",
-    title: "Social Media Campaign",
-    client: "FashionBrand",
-    duration: "0:30",
-    status: "Completed",
-    progress: 100,
-    deadline: "2024-01-10",
-    editor: "Emma Davis",
-    thumbnail: "/placeholder.svg?height=60&width=100"
-  },
-  {
-    id: "VID-004",
-    title: "Training Module Series",
-    client: "EduTech",
-    duration: "12:15",
-    status: "Planning",
-    progress: 25,
-    deadline: "2024-02-01",
-    editor: "Alex Wilson",
-    thumbnail: "/placeholder.svg?height=60&width=100"
-  }
-]
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function VideoProjectsPage() {
+  const videoProjects = useQuery(api.videoProjects.list) || [];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (videoProjects === undefined) {
+    return (
+      <SideBar>
+        <div className="p-8 space-y-4">
+          <Skeleton className="h-10 w-48" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </SideBar>
+    );
+  }
+
+  // Derive stats from real data
+  const activeCount = videoProjects.filter(p => p.status !== "Completed").length;
+  const completedCount = videoProjects.filter(p => p.status === "Completed").length;
+  const editors = new Set(videoProjects.map(p => p.editor)).size;
+
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -76,7 +58,20 @@ export default function VideoProjectsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="video/*,image/*"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  // TODO: upload files to Convex storage
+                  alert(`${e.target.files.length} file(s) selected. Storage upload coming soon.`);
+                }
+              }}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-4 w-4 mr-2" />
               Upload Assets
             </Button>
@@ -96,9 +91,9 @@ export default function VideoProjectsPage() {
               <Play className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
+              <div className="text-2xl font-bold">{activeCount}</div>
               <p className="text-xs text-muted-foreground">
-                +2 from last month
+                {activeCount === videoProjects.length ? "All in progress" : `${completedCount} completed`}
               </p>
             </CardContent>
           </Card>
@@ -109,8 +104,8 @@ export default function VideoProjectsPage() {
               <Download className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">28</div>
-              <p className="text-xs text-muted-foreground">This quarter</p>
+              <div className="text-2xl font-bold">{completedCount}</div>
+              <p className="text-xs text-muted-foreground">Total completed</p>
             </CardContent>
           </Card>
 
@@ -135,7 +130,7 @@ export default function VideoProjectsPage() {
               <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">6</div>
+              <div className="text-2xl font-bold">{editors}</div>
               <p className="text-xs text-muted-foreground">Active editors</p>
             </CardContent>
           </Card>
@@ -179,15 +174,21 @@ export default function VideoProjectsPage() {
                     <TableRow key={project.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <img
-                            src={project.thumbnail || "/placeholder.svg"}
-                            alt={project.title}
-                            className="w-16 h-10 object-cover rounded"
-                          />
+                          {project.thumbnail ? (
+                            <img
+                              src={project.thumbnail}
+                              alt={project.title}
+                              className="w-16 h-10 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-16 h-10 rounded bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center">
+                              <Play className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
                           <div>
                             <div className="font-medium">{project.title}</div>
                             <div className="text-sm text-muted-foreground">
-                              {project.id}
+                              {project._id?.slice(-8)}
                             </div>
                           </div>
                         </div>

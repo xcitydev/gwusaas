@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
-import { verifyProjectAccess, getCurrentUserId } from "./lib/spec";
+import { mutation, query, action, internalQuery } from "./_generated/server";
+import { verifyProjectAccess } from "./lib/spec";
+import { internal } from "./_generated/api";
 
 /**
  * Create a new lead
@@ -110,6 +111,36 @@ export const list = query({
   },
 });
 
+export const getProjectForExport = internalQuery({
+  args: { projectId: v.id("project") },
+  handler: async (ctx, args) => ctx.db.get(args.projectId),
+});
+
+export const getLeadsForExport = internalQuery({
+  args: {
+    projectId: v.id("project"),
+    status: v.optional(v.string()),
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const leads = await ctx.db.query("lead")
+      .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    let filtered = leads;
+    if (args.status) filtered = filtered.filter((l) => l.status === args.status);
+    if (args.startDate || args.endDate) {
+      filtered = filtered.filter((l) => {
+        if (args.startDate && l.createdAt < args.startDate) return false;
+        if (args.endDate && l.createdAt > args.endDate) return false;
+        return true;
+      });
+    }
+    filtered.sort((a, b) => b.createdAt - a.createdAt);
+    return filtered;
+  },
+});
+
 /**
  * Export leads as CSV
  */
@@ -120,55 +151,20 @@ export const exportCsv = action({
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
-    // Verify access
-    const project = await ctx.runQuery(async (ctx) => {
-      return await ctx.db.get(args.projectId);
+  handler: async (ctx, args): Promise<{ csv: string; filename: string }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const project = await ctx.runQuery(internal.leads.getProjectForExport, { projectId: args.projectId });
+    if (!project) throw new Error("Project not found");
+    if (project.clerkUserId !== identity.subject) throw new Error("Unauthorized: You don't have access to this project");
+
+    const result = await ctx.runQuery(internal.leads.getLeadsForExport, {
+      projectId: args.projectId,
+      status: args.status,
+      startDate: args.startDate,
+      endDate: args.endDate,
     });
-    if (!project) {
-      throw new Error("Project not found");
-    }
-    
-    // Verify user owns the project
-    const userId = await getCurrentUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized");
-    }
-    
-    if (project.clerkUserId !== userId) {
-      throw new Error("Unauthorized: You don't have access to this project");
-    }
-
-    // Get leads
-    const result = await ctx.runQuery(
-      async (ctx) => {
-        let query = ctx.db
-          .query("lead")
-          .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId));
-
-        const leads = await query.collect();
-
-        // Filter by status if provided
-        let filtered = leads;
-        if (args.status) {
-          filtered = filtered.filter((lead) => lead.status === args.status);
-        }
-
-        // Filter by date range if provided
-        if (args.startDate || args.endDate) {
-          filtered = filtered.filter((lead) => {
-            if (args.startDate && lead.createdAt < args.startDate) return false;
-            if (args.endDate && lead.createdAt > args.endDate) return false;
-            return true;
-          });
-        }
-
-        // Sort by createdAt descending
-        filtered.sort((a, b) => b.createdAt - a.createdAt);
-
-        return filtered;
-      }
-    );
 
     // Generate CSV
     const headers = ["Date", "Source", "Handle/Email", "Message", "Status", "Notes"];

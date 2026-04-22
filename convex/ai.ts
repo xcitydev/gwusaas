@@ -1,54 +1,47 @@
 import { v } from "convex/values";
-import { action, query, internalMutation } from "./_generated/server";
+import { action, query, internalMutation, internalQuery } from "./_generated/server";
 import { verifyProjectAccess } from "./lib/spec";
 import { internal } from "./_generated/api";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+}
+
+export const getProjectInternal = internalQuery({
+  args: { projectId: v.id("project") },
+  handler: async (ctx, args) => ctx.db.get(args.projectId),
 });
 
-/**
- * Check rate limits for AI generation
- */
-async function checkRateLimit(
-  ctx: any,
-  projectId: string,
-  reportType: string,
-  plan: string
-): Promise<{ allowed: boolean; remaining: number }> {
-  const now = Date.now();
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayStartMs = todayStart.getTime();
+export const getOnboardingInternal = internalQuery({
+  args: { projectId: v.id("project") },
+  handler: async (ctx, args) =>
+    ctx.db.query("onboardingResponse")
+      .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId))
+      .first(),
+});
 
-  // Get today's reports for this project and type
-  const todayReports = await ctx.runQuery(async (ctx) => {
-    const allReports = await ctx.db
-      .query("aiReport")
-      .withIndex("by_project_type", (q) => 
-        q.eq("projectId", projectId as any).eq("reportType", reportType)
+export const getMetricsInternal = internalQuery({
+  args: { projectId: v.id("project") },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("igMetricDaily")
+      .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    return all.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+  },
+});
+
+export const getTodayReportsInternal = internalQuery({
+  args: { projectId: v.id("project"), reportType: v.string(), todayStartMs: v.number() },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("aiReport")
+      .withIndex("by_project_type", (q) =>
+        q.eq("projectId", args.projectId).eq("reportType", args.reportType)
       )
       .collect();
-
-    return allReports.filter((r) => r.createdAt >= todayStartMs);
-  });
-
-  // Rate limits based on plan
-  const limits: Record<string, number> = {
-    trial: 2,
-    pro: 5,
-    enterprise: 20,
-  };
-
-  const limit = limits[plan] || limits.trial;
-  const remaining = Math.max(0, limit - todayReports.length);
-
-  return {
-    allowed: remaining > 0,
-    remaining,
-  };
-}
+    return all.filter((r) => r.createdAt >= args.todayStartMs);
+  },
+});
 
 /**
  * Generate AI report
@@ -56,55 +49,32 @@ async function checkRateLimit(
 export const generate = action({
   args: {
     projectId: v.id("project"),
-    reportType: v.string(), // "weekly_insight" | "caption_batch" | "hashtag_list" | "competitor_scan" | "action_plan"
+    reportType: v.string(),
   },
-  handler: async (ctx, args) => {
-    // Verify access and get project/org info
-    const project = await ctx.runQuery(async (ctx) => {
-      return await ctx.db.get(args.projectId);
-    });
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
+  handler: async (ctx, args): Promise<{ success: boolean; reportId: any }> => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
-    }
+    if (!identity) throw new Error("Unauthorized");
 
-    // Verify user owns this project
-    if (project.clerkUserId !== identity.subject) {
-      throw new Error("Unauthorized: You don't have access to this project");
-    }
+    const project = await ctx.runQuery(internal.ai.getProjectInternal, { projectId: args.projectId });
+    if (!project) throw new Error("Project not found");
+    if (project.clerkUserId !== identity.subject) throw new Error("Unauthorized: You don't have access to this project");
 
-    // Check rate limit (using trial plan for now - can be stored in user profile later)
-    const rateLimit = await checkRateLimit(ctx, args.projectId, args.reportType, "trial");
-    if (!rateLimit.allowed) {
-      throw new Error(`Rate limit exceeded. Daily limit: 2 generations per type. Resets at 00:00.`);
-    }
-
-    // Get onboarding data
-    const onboarding = await ctx.runQuery(async (ctx) => {
-      return await ctx.db
-        .query("onboardingResponse")
-        .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId))
-        .first();
+    // Check rate limit
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayReports = await ctx.runQuery(internal.ai.getTodayReportsInternal, {
+      projectId: args.projectId,
+      reportType: args.reportType,
+      todayStartMs: todayStart.getTime(),
     });
+    const limits: Record<string, number> = { trial: 2, pro: 5, enterprise: 20 };
+    const remaining = Math.max(0, (limits["trial"] ?? 2) - todayReports.length);
+    if (remaining <= 0) throw new Error("Rate limit exceeded. Daily limit: 2 generations per type. Resets at 00:00.");
 
-    if (!onboarding || !onboarding.completed) {
-      throw new Error("Onboarding must be completed before generating AI reports");
-    }
+    const onboarding = await ctx.runQuery(internal.ai.getOnboardingInternal, { projectId: args.projectId });
+    if (!onboarding || !onboarding.completed) throw new Error("Onboarding must be completed before generating AI reports");
 
-    // Get last 30 days of metrics
-    const metrics = await ctx.runQuery(async (ctx) => {
-      const allMetrics = await ctx.db
-        .query("igMetricDaily")
-        .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId))
-        .collect();
-
-      const sorted = allMetrics.sort((a, b) => b.date.localeCompare(a.date));
-      return sorted.slice(0, 30);
-    });
+    const metrics = await ctx.runQuery(internal.ai.getMetricsInternal, { projectId: args.projectId });
 
     // Build prompt based on report type
     let prompt = buildPrompt(args.reportType, onboarding, metrics);
@@ -116,7 +86,7 @@ export const generate = action({
 
     while (attempts < maxAttempts) {
       try {
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAI().chat.completions.create({
           model: "gpt-4o",
           messages: [
             {

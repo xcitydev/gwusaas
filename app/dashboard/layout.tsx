@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { ClientProvider } from "@/context/ClientContext";
+import { TrialBanner } from "@/components/TrialBanner";
 
 export default async function DashboardLayout({
   children,
@@ -14,5 +15,10 @@ export default async function DashboardLayout({
     return redirectToSignIn();
   }
 
-  return <ClientProvider>{children}</ClientProvider>;
+  return (
+    <ClientProvider>
+      <TrialBanner />
+      {children}
+    </ClientProvider>
+  );
 }

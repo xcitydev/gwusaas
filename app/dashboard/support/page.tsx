@@ -377,11 +377,11 @@ export default function SupportPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="outline" className="w-full">
-                    support@agency.com
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href="mailto:support@boolspace.com">support@boolspace.com</a>
                   </Button>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Response within 4 hours
+                    Response within 24 hours
                   </p>
                 </CardContent>
               </Card>
@@ -396,7 +396,7 @@ export default function SupportPage() {
                 </CardHeader>
                 <CardContent>
                   <Button variant="outline" className="w-full">
-                    +1 (555) 123-4567
+                    +1 (888) 555-0199
                   </Button>
                   <p className="text-xs text-muted-foreground mt-2">
                     Available 24/7 for urgent issues

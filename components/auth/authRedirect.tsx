@@ -70,18 +70,21 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
     }
   }, [convexUser, isAuthPage, isLoaded, isSignedIn, pathname, router]);
 
-  if (!isLoaded) {
+  if (!isLoaded || (isSignedIn && (convexUser === undefined || isProvisioningProfile))) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
-      </div>
-    );
-  }
-
-  if (isSignedIn && (convexUser === undefined || isProvisioningProfile)) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center space-y-6">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/10 border-t-primary shadow-[0_0_20px_rgba(245,158,11,0.2)]"></div>
+          <div className="absolute inset-0 animate-pulse bg-primary/20 rounded-full blur-2xl -z-10"></div>
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-xs font-black text-primary uppercase tracking-[0.3em] animate-pulse">
+            {isProvisioningProfile ? "Initializing Protocol" : "Establishing Uplink"}
+          </p>
+          <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">
+            {isProvisioningProfile ? "Syncing Workspace Architectures" : "Verifying Clearance Credentials"}
+          </p>
+        </div>
       </div>
     );
   }

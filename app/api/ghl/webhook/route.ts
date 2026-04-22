@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 
 type WebhookPayload = {
   type?: string;
@@ -12,7 +13,23 @@ type WebhookPayload = {
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const rawPayload = await request.text();
-    console.log("Received GHL webhook payload", rawPayload);
+    const signature = request.headers.get("x-ghl-signature");
+    const secret = process.env.GHL_WEBHOOK_SECRET;
+
+    // Verify signature in production
+    if (process.env.NODE_ENV === "production") {
+      if (!signature || !secret) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const hmac = crypto.createHmac("sha256", secret);
+      hmac.update(rawPayload);
+      const expectedSignature = hmac.digest("hex");
+
+      if (signature !== expectedSignature) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
+    }
 
     let payload: WebhookPayload = {};
     try {

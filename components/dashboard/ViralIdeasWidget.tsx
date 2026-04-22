@@ -1,26 +1,24 @@
-"use client";
-
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Sparkles, Filter, Bookmark, Grid } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { normalizePlan, hasAccess } from "@/lib/plans";
 import { ViralIdeaCard, type ViralIdea } from "@/components/dashboard/ViralIdeaCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const platforms = ["all", "youtube", "instagram", "tiktok", "substack", "reddit"] as const;
 const categories = ["all", "client attraction", "education", "social proof", "controversy", "trend"] as const;
 
 const loadingMessages = [
-  "Searching what's trending...",
-  "Analyzing your niche...",
-  "Generating ideas...",
+  "Scouring the social graph...",
+  "Synthesizing high-intent angles...",
+  "Architecting your content strategy...",
 ];
 
 export function ViralIdeasWidget() {
@@ -120,87 +118,118 @@ export function ViralIdeasWidget() {
   };
 
   return (
-    <Card>
-      <CardHeader className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle>Viral content ideas</CardTitle>
-            <CardDescription>AI-generated ideas to attract more clients</CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">Saved: {savedIdeas?.length || 0}</Badge>
-            <Button onClick={() => void generate()} disabled={loading || !config}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh ideas
-            </Button>
-          </div>
-        </div>
-        <div className="rounded-md border border-border/70 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
-          It searches for: your niche, your target platforms, and patterns from high-performing
-          posts (hooks, angles, and formats that get replies/clients), then turns that into 30
-          ideas you can post this week.
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {platforms.map((item) => (
-            <Button
-              key={item}
-              size="sm"
-              variant={platformFilter === item ? "default" : "outline"}
-              onClick={() => setPlatformFilter(item)}
-            >
-              {item}
-            </Button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((item) => (
-            <Button
-              key={item}
-              size="sm"
-              variant={categoryFilter === item ? "default" : "outline"}
-              onClick={() => setCategoryFilter(item)}
-            >
-              {item}
-            </Button>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!config ? (
-          <div className="rounded-lg border border-dashed p-5 text-sm">
-            Set up your content pipeline niche first to generate viral ideas.
-          </div>
-        ) : loading ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{loadingMessages[loadingIndex]}</p>
-            <div className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <Skeleton key={idx} className="h-52 w-full" />
-              ))}
+    <div className="flex flex-col h-full">
+      <div className="p-8 space-y-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white/90">Viral Insights</h3>
+              <p className="text-xs font-medium text-muted-foreground">AI-Engineered Content Strategy</p>
             </div>
           </div>
-        ) : visibleIdeas.length === 0 ? (
-          <Button onClick={() => void generate()}>Generate your first batch</Button>
-        ) : (
-          <>
-            <div className="grid gap-4 md:grid-cols-2">
-              {visibleIdeas.map((item, idx) => (
-                <ViralIdeaCard
-                  key={`${item.idea}-${idx}`}
-                  item={item}
-                  onSave={() => void save(item, false)}
-                  onAddToPipeline={() => void save(item, true)}
-                />
-              ))}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+              <Bookmark className="w-3 h-3 text-primary" />
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">{savedIdeas?.length || 0} Saved</span>
             </div>
-            {freeLocked && filtered.length > 5 ? (
-              <div className="rounded-lg border border-dashed p-4 text-sm">
-                Upgrade to Starter+ to unlock all 30 ideas and unlimited refreshes.
+            <Button onClick={() => void generate()} disabled={loading || !config} className="h-9 px-4 text-xs font-bold amber-glow transition-all">
+              <RefreshCw className={cn("mr-2 h-3.5 w-3.5", loading && "animate-spin")} />
+              Sync Engine
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3 bg-white/5 p-1.5 rounded-xl border border-white/5 w-fit">
+            <div className="flex items-center gap-2 px-3 mr-2">
+              <Filter className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Platforms</span>
+            </div>
+            {platforms.map((item) => (
+              <button
+                key={item}
+                onClick={() => setPlatformFilter(item)}
+                className={cn(
+                  "px-3 py-1 text-[10px] font-bold rounded-lg transition-all",
+                  platformFilter === item 
+                    ? "bg-primary text-primary-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                )}
+              >
+                {item.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 bg-white/5 p-1.5 rounded-xl border border-white/5 w-fit">
+            <div className="flex items-center gap-2 px-3 mr-2">
+              <Grid className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Categories</span>
+            </div>
+            {categories.map((item) => (
+              <button
+                key={item}
+                onClick={() => setCategoryFilter(item)}
+                className={cn(
+                  "px-3 py-1 text-[10px] font-bold rounded-lg transition-all",
+                  categoryFilter === item 
+                    ? "bg-primary text-primary-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                )}
+              >
+                {item.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative min-h-[400px]">
+          {!config ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center glass-card rounded-3xl border-dashed">
+              <Sparkles className="w-8 h-8 text-muted-foreground opacity-20 mb-4" />
+              <p className="text-sm font-medium text-muted-foreground">Configure your Content Pipeline seeds to activate Viral Insights.</p>
+            </div>
+          ) : loading ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <p className="text-xs font-bold text-primary uppercase tracking-widest animate-pulse">{loadingMessages[loadingIndex]}</p>
               </div>
-            ) : null}
-          </>
-        )}
-      </CardContent>
-    </Card>
+              <div className="grid gap-6 md:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <Skeleton key={idx} className="h-48 w-full rounded-2xl bg-white/5" />
+                ))}
+              </div>
+            </div>
+          ) : visibleIdeas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center glass-card rounded-3xl">
+              <Button onClick={() => void generate()} className="amber-glow h-11 px-8 font-black uppercase tracking-wider">Initialize Generation</Button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {visibleIdeas.map((item, idx) => (
+                  <ViralIdeaCard
+                    key={`${item.idea}-${idx}`}
+                    item={item}
+                    onSave={() => void save(item, false)}
+                    onAddToPipeline={() => void save(item, true)}
+                  />
+                ))}
+              </div>
+              {freeLocked && filtered.length > 5 ? (
+                <div className="p-6 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+                  <p className="text-sm font-bold text-primary/80">Upgrade to unlock 25+ more tactical ideas.</p>
+                  <Button variant="outline" className="h-8 text-[10px] font-black border-primary/20 text-primary uppercase tracking-widest">Upgrade Now</Button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

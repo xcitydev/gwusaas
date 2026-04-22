@@ -25,7 +25,7 @@ export default function ApprovalsPage() {
   const { user, isLoaded: isUserLoaded } = useUser()
 
   const convexOrg = useQuery(
-    api.organizations.getByClerkId,
+    api.organization.getByClerkId,
     organization?.id ? { clerkOrgId: organization.id } : "skip"
   )
 
@@ -45,7 +45,7 @@ export default function ApprovalsPage() {
     }
   }
 
-  if (!isOrgLoaded || !isUserLoaded || (organization && !convexOrg)) {
+  if (!isOrgLoaded || !isUserLoaded || (organization && convexOrg === undefined)) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>

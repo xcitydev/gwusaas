@@ -1,5 +1,45 @@
 export type Plan = "free" | "starter" | "growth" | "elite" | "white_label";
 
+export interface PlanLimits {
+  dailyLeadScrapes: number;
+  visibleLeadsListSize: number;
+  dailyAiGenerations: number;
+  dailyDms: number;
+}
+
+export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
+  free: {
+    dailyLeadScrapes: 10,
+    visibleLeadsListSize: 5,
+    dailyAiGenerations: 2,
+    dailyDms: 3,
+  },
+  starter: {
+    dailyLeadScrapes: 100,
+    visibleLeadsListSize: 50,
+    dailyAiGenerations: 20,
+    dailyDms: 30,
+  },
+  growth: {
+    dailyLeadScrapes: 500,
+    visibleLeadsListSize: 250,
+    dailyAiGenerations: 100,
+    dailyDms: 150,
+  },
+  elite: {
+    dailyLeadScrapes: 2000,
+    visibleLeadsListSize: 1000,
+    dailyAiGenerations: 500,
+    dailyDms: 750,
+  },
+  white_label: {
+    dailyLeadScrapes: 10000,
+    visibleLeadsListSize: 5000,
+    dailyAiGenerations: 2000,
+    dailyDms: 3000,
+  },
+};
+
 export const PLAN_ORDER: Plan[] = [
   "free",
   "starter",
