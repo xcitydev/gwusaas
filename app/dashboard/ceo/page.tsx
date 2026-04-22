@@ -15,6 +15,7 @@ import SideBar from "@/components/SideBar";
 import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { type Id } from "@/convex/_generated/dataModel";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -26,12 +27,12 @@ export default function CEOPage() {
 
   const userKpis = useQuery(
     api.ceo.userKpis,
-    organization?.id ? { organizationId: organization.id as any } : "skip"
+    organization?.id ? { organizationId: organization.id as Id<"organizations"> } : "skip"
   );
 
   const topGrowth = useQuery(
     api.ceo.topGrowth,
-    organization?.id ? { organizationId: organization.id as any, limit: 10 } : "skip"
+    organization?.id ? { organizationId: organization.id as Id<"organizations">, limit: 10 } : "skip"
   );
 
   const monthlyReport = useAction(api.ceo.monthlyReport);
@@ -39,10 +40,10 @@ export default function CEOPage() {
   const handleExportReport = async () => {
     if (!organization?.id) return;
     try {
-      const result = await monthlyReport({ organizationId: organization.id as any });
+      const result = await monthlyReport({ organizationId: organization.id as Id<"organizations"> });
       toast.success("Monthly report generated! Check your email.");
-    } catch (error: any) {
-      toast.error(`Failed to generate report: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to generate report: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 

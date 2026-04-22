@@ -47,7 +47,8 @@ export default defineSchema({
   organizations: defineTable({
     ownerId: v.string(),
     name: v.string(),
-    plan: v.string(), // "starter" | "pro" | "agency"
+    plan: v.string(), // "free" | "starter" | "growth" | "elite" | "white_label"
+    trialEndsAt: v.optional(v.number()),
     settings: v.optional(v.any()), // IG tokens, brand colors, etc.
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -616,4 +617,29 @@ export default defineSchema({
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_referral_code", ["referralCode"]),
+
+  videoProjects: defineTable({
+    clerkUserId: v.string(),
+    organizationId: v.optional(v.id("organizations")),
+    title: v.string(),
+    client: v.string(),
+    duration: v.string(),
+    status: v.string(), // "In Production" | "Review" | "Completed" | "Planning"
+    progress: v.number(),
+    deadline: v.string(),
+    editor: v.string(),
+    thumbnail: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_organization_id", ["organizationId"]),
+
+  userUsage: defineTable({
+    clerkUserId: v.string(),
+    metric: v.string(), // "dailyLeadScrapes" | "dailyAiGenerations" | "dailyDms"
+    date: v.string(), // "YYYY-MM-DD"
+    count: v.number(),
+  })
+    .index("by_user_metric_date", ["clerkUserId", "metric", "date"]),
 });

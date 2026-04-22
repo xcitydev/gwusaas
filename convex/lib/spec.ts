@@ -17,7 +17,7 @@ export async function getCurrentUserId(
  */
 export async function getCurrentUserProfile(
   ctx: DbCtx
-): Promise<{ _id: string; clerkUserId: string; role: string } | null> {
+): Promise<{ _id: string; clerkUserId: string; role: string; fullName: string } | null> {
   const userId = await getCurrentUserId(ctx);
   if (!userId) return null;
 

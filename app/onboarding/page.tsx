@@ -11,6 +11,7 @@ import { ArrowLeft, ArrowRight, CheckCircle, Upload } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { type Id } from "@/convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SideBar from "@/components/SideBar";
@@ -45,7 +46,7 @@ export default function OnboardingPage() {
   // Get existing onboarding if project exists
   const existingOnboarding = useQuery(
     api.onboarding.get,
-    projectId ? { projectId: projectId as any } : "skip"
+    projectId ? { projectId: projectId as Id<"project"> } : "skip"
   );
 
   const saveStep = useMutation(api.onboarding.saveStep);
@@ -95,7 +96,7 @@ export default function OnboardingPage() {
 
       // Save step data
       await saveStep({
-        projectId: currentProjectId as any,
+        projectId: currentProjectId as Id<"project">,
         stepData: {
           brandTone: formData.brandTone,
           colorPalette: formData.colorPalette,
@@ -108,8 +109,8 @@ export default function OnboardingPage() {
       });
 
       toast.success("Progress saved!");
-    } catch (error: any) {
-      toast.error(`Failed to save: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to save: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -133,12 +134,12 @@ export default function OnboardingPage() {
       // Complete onboarding
       if (projectId) {
         try {
-          await completeOnboarding({ projectId: projectId as any });
+          await completeOnboarding({ projectId: projectId as Id<"project"> });
           await profile({ clerkUserId: user?.id as string });
           toast.success("Onboarding completed!");
           router.push("/dashboard");
-        } catch (error: any) {
-          toast.error(`Failed to complete: ${error.message}`);
+        } catch (error: unknown) {
+          toast.error(`Failed to complete: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       }
     }
@@ -154,8 +155,12 @@ export default function OnboardingPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
+      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+          <div className="absolute inset-0 animate-pulse bg-primary/10 rounded-full blur-xl"></div>
+        </div>
+        <p className="text-sm text-muted-foreground animate-pulse">Initializing onboarding...</p>
       </div>
     );
   }

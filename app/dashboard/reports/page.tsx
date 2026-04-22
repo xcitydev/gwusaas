@@ -38,31 +38,33 @@ import {
 } from "lucide-react";
 import SideBar from "@/components/SideBar";
 
-const monthlyPerformance = [
-  { month: "Jan", outreach: 2400, conversions: 240, revenue: 12000 },
-  { month: "Feb", outreach: 2800, conversions: 320, revenue: 15000 },
-  { month: "Mar", outreach: 3200, conversions: 380, revenue: 18000 },
-  { month: "Apr", outreach: 3600, conversions: 420, revenue: 21000 },
-  { month: "May", outreach: 4000, conversions: 480, revenue: 24000 },
-  { month: "Jun", outreach: 4400, conversions: 520, revenue: 26000 },
-];
-
-const serviceBreakdown = [
-  { name: "Social Media", value: 35, color: "#8884d8" },
-  { name: "Website Dev", value: 25, color: "#82ca9d" },
-  { name: "Video Production", value: 20, color: "#ffc658" },
-  { name: "Content Creation", value: 15, color: "#ff7300" },
-  { name: "Other", value: 5, color: "#00ff00" },
-];
-
-const platformMetrics = [
-  { platform: "Instagram", followers: 12847, engagement: 4.8, growth: 18.2 },
-  { platform: "LinkedIn", followers: 8432, engagement: 6.2, growth: 12.5 },
-  { platform: "Facebook", followers: 15623, engagement: 3.1, growth: 8.7 },
-  { platform: "Twitter", followers: 6789, engagement: 2.9, growth: 15.3 },
-];
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ReportsPage() {
+  const monthlyPerformance = useQuery(api.analytics.getMonthlyPerformance) || [];
+  const serviceBreakdown = useQuery(api.analytics.getServiceBreakdown) || [];
+  const platformMetrics = useQuery(api.analytics.getPlatformMetrics) || [];
+  
+  const isLoading = !monthlyPerformance.length || !serviceBreakdown.length || !platformMetrics.length;
+
+  if (isLoading) {
+    return (
+      <SideBar>
+        <div className="p-8 space-y-4">
+          <Skeleton className="h-10 w-48" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </SideBar>
+    );
+  }
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6">

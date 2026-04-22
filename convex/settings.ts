@@ -1,6 +1,7 @@
-import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 import { verifyOrgAccess, hasAdminOrManagerRole } from "./lib/spec";
+import { encrypt } from "./lib/encryption";
 
 /**
  * Set Instagram credentials (tokens/handles)
@@ -22,23 +23,23 @@ export const setIgCreds = mutation({
     }
 
     // Get or create settings
-    const org = await ctx.db.get(args.organizationId as any);
+    const org = await ctx.db.get(args.organizationId);
     if (!org) {
       throw new Error("Organization not found");
     }
 
-    const settings = org.settings || {};
+    const settings = (org.settings as Record<string, any>) || {};
     const igSettings = settings.ig || {};
 
-    // Update IG credentials
+    // Update IG credentials (encrypt in production)
     if (args.instagramHandle !== undefined) {
       igSettings.instagramHandle = args.instagramHandle;
     }
     if (args.accessToken !== undefined) {
-      igSettings.accessToken = args.accessToken;
+      igSettings.accessToken = await encrypt(args.accessToken);
     }
     if (args.metaAppId !== undefined) {
-      igSettings.metaAppId = args.metaAppId;
+      igSettings.metaAppId = await encrypt(args.metaAppId);
     }
 
     settings.ig = igSettings;
@@ -63,14 +64,14 @@ export const get = query({
     // Verify access
     await verifyOrgAccess(ctx, args.organizationId);
 
-    const org = await ctx.db.get(args.organizationId as any);
+    const org = await ctx.db.get(args.organizationId);
     if (!org) {
       throw new Error("Organization not found");
     }
 
     return {
       plan: org.plan,
-      settings: org.settings || {},
+      settings: (org.settings as Record<string, any>) || {},
     };
   },
 });

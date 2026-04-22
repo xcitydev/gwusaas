@@ -10,6 +10,7 @@ import SideBar from "@/components/SideBar";
 import { useUser, useOrganization } from "@clerk/nextjs";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { type Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import {
   Select,
@@ -18,6 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { PLAN_LIMITS, normalizePlan } from "@/lib/plans";
+import { useMutation } from "convex/react";
+
 
 const reportTypes = [
   { id: "weekly_insight", label: "Insights", icon: Lightbulb },
@@ -33,10 +38,17 @@ export default function AIPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("weekly_insight");
   const [generating, setGenerating] = useState<string | null>(null);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  // Plan & Usage Logic
+  const userPlan = normalizePlan(user?.publicMetadata?.plan);
+  const limits = PLAN_LIMITS[userPlan];
+  const usageCount = useQuery(api.usage.getUsage, { metric: "dailyAiGenerations" }) ?? 0;
+  const checkUsage = useMutation(api.usage.checkAndIncrementUsage);
 
   // Get organization
   const convexOrg = useQuery(
-    api.organizations.getByClerkId,
+    api.organization.getByClerkId,
     organization?.id ? { clerkOrgId: organization.id } : "skip"
   );
 
@@ -58,22 +70,33 @@ export default function AIPage() {
   const latestReport = useQuery(
     api.ai.latest,
     selectedProjectId
-      ? { projectId: selectedProjectId as any, reportType: activeTab }
+      ? { projectId: selectedProjectId as Id<"project">, reportType: activeTab }
       : "skip"
   );
 
   const generateReport = useAction(api.ai.generate);
 
   const handleGenerate = async (reportType: string) => {
-    if (!selectedProjectId) {
+    if (!selectedProjectId || !user?.id) {
       toast.error("Please select a project");
+      return;
+    }
+
+    // Check Usage first
+    const usageCheck = await checkUsage({
+      metric: "dailyAiGenerations",
+      increment: 1, // Generating 1 report equals 1 credit
+    });
+
+    if (!usageCheck.success) {
+      setIsUpgradeModalOpen(true);
       return;
     }
 
     setGenerating(reportType);
     try {
       await generateReport({
-        projectId: selectedProjectId as any,
+        projectId: selectedProjectId as Id<"project">,
         reportType,
       });
       toast.success("Report generated successfully!");
@@ -332,20 +355,26 @@ export default function AIPage() {
               Generate AI-powered insights, captions, hashtags, and more
             </p>
           </div>
-          {projects && projects.length > 0 && (
-            <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p: any) => (
-                  <SelectItem key={p._id} value={p._id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1 bg-primary/5 border-primary/20 text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              {Math.max(0, limits.dailyAiGenerations - usageCount)} / {limits.dailyAiGenerations} AI Generations left today
+            </Badge>
+            {projects && projects.length > 0 && (
+              <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p: any) => (
+                    <SelectItem key={p._id} value={p._id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -402,6 +431,12 @@ export default function AIPage() {
             </TabsContent>
           ))}
         </Tabs>
+
+        <UpgradeModal 
+          isOpen={isUpgradeModalOpen} 
+          onOpenChange={setIsUpgradeModalOpen}
+          description={`You've reached your limit of ${limits.dailyAiGenerations} AI generations today on the ${userPlan} plan. Upgrade now to generate unlimited content.`}
+        />
       </div>
     </SideBar>
   );

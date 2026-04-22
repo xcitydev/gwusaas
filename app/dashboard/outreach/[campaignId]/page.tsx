@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import SideBar from "@/components/SideBar";
@@ -16,86 +16,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-
-const sampleCampaignDetails: Record<
-  string,
-  {
-    campaignName: string;
-    contacts: Array<{
-      _id: string;
-      instagramUsername: string;
-      qualificationStatus: string;
-      dmStatus: string;
-      lastFollowUpAt?: number;
-      notes?: string;
-    }>;
-  }
-> = {
-  "demo-campaign-1": {
-    campaignName: "Founder outreach sprint",
-    contacts: [
-      {
-        _id: "sample-contact-1",
-        instagramUsername: "scalewithsam",
-        qualificationStatus: "top_lead",
-        dmStatus: "replied",
-        lastFollowUpAt: Date.now() - 1000 * 60 * 60 * 24,
-        notes: "Asked for pricing deck.",
-      },
-      {
-        _id: "sample-contact-2",
-        instagramUsername: "growthjamie",
-        qualificationStatus: "qualified",
-        dmStatus: "booked",
-        lastFollowUpAt: Date.now() - 1000 * 60 * 60 * 6,
-        notes: "Booked call for Friday 2pm.",
-      },
-      {
-        _id: "sample-contact-3",
-        instagramUsername: "operatormike",
-        qualificationStatus: "maybe",
-        dmStatus: "sent",
-        lastFollowUpAt: Date.now() - 1000 * 60 * 60 * 72,
-        notes: "Needs shorter follow-up.",
-      },
-    ],
-  },
-  "demo-campaign-2": {
-    campaignName: "Follow-up recovery wave",
-    contacts: [
-      {
-        _id: "sample-contact-4",
-        instagramUsername: "brandbuilderash",
-        qualificationStatus: "qualified",
-        dmStatus: "replied",
-        lastFollowUpAt: Date.now() - 1000 * 60 * 60 * 20,
-        notes: "Wants monthly retainer option.",
-      },
-      {
-        _id: "sample-contact-5",
-        instagramUsername: "adswithmaria",
-        qualificationStatus: "top_lead",
-        dmStatus: "closed",
-        lastFollowUpAt: Date.now() - 1000 * 60 * 60 * 36,
-        notes: "Converted on starter package.",
-      },
-    ],
-  },
-};
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CampaignDetailPage() {
   const params = useParams<{ campaignId: string }>();
   const { selectedClientId } = useSelectedClient();
   const [filter, setFilter] = useState("all");
-  const sampleDetail = sampleCampaignDetails[params.campaignId];
-  const [sampleContacts, setSampleContacts] = useState(sampleDetail?.contacts || []);
+
   const updateStatus = useMutation(api.outreachWorkspace.updateContactStatus);
   const moveToDeals = useMutation(api.outreachWorkspace.createDealFromContact);
 
   const detail = useQuery(
     api.outreachWorkspace.getCampaignDetail,
-    selectedClientId && !sampleDetail
+    selectedClientId
       ? { campaignId: params.campaignId as never, clientId: selectedClientId }
       : "skip",
   ) as
@@ -113,19 +46,8 @@ export default function CampaignDetailPage() {
     | null
     | undefined;
 
-  const effectiveDetail = sampleDetail
-    ? {
-        campaign: { campaignName: sampleDetail.campaignName },
-        contacts: sampleContacts,
-      }
-    : detail;
-
-  useEffect(() => {
-    setSampleContacts(sampleDetail?.contacts || []);
-  }, [params.campaignId, sampleDetail]);
-
   const rows = useMemo(() => {
-    const contacts = effectiveDetail?.contacts || [];
+    const contacts = detail?.contacts || [];
     if (filter === "all") return contacts;
     if (filter === "need_follow_up") {
       const now = Date.now();
@@ -136,15 +58,44 @@ export default function CampaignDetailPage() {
       });
     }
     return contacts.filter((c) => c.dmStatus === filter);
-  }, [effectiveDetail?.contacts, filter]);
+  }, [detail?.contacts, filter]);
 
   const quickStatuses = ["all", "replied", "booked", "need_follow_up", "closed"];
+
+  // Loading state
+  if (detail === undefined) {
+    return (
+      <SideBar>
+        <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </SideBar>
+    );
+  }
+
+  // Not found / no client selected
+  if (!detail || !selectedClientId) {
+    return (
+      <SideBar>
+        <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
+          <h1 className="text-3xl font-bold">Campaign Not Found</h1>
+          <p className="text-muted-foreground">
+            {!selectedClientId
+              ? "Select a client from the sidebar to view this campaign."
+              : "This campaign does not exist or you don't have access to it."}
+          </p>
+        </div>
+      </SideBar>
+    );
+  }
 
   return (
     <SideBar>
       <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
         <div>
-          <h1 className="text-3xl font-bold">{effectiveDetail?.campaign.campaignName || "Campaign"}</h1>
+          <h1 className="text-3xl font-bold">{detail.campaign.campaignName}</h1>
           <p className="text-muted-foreground">Track messages, replies, and next steps.</p>
         </div>
 
@@ -188,14 +139,6 @@ export default function CampaignDetailPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (sampleDetail) {
-                              setSampleContacts((prev) =>
-                                prev.map((item) =>
-                                  item._id === contact._id ? { ...item, dmStatus: status } : item,
-                                ),
-                              );
-                              return;
-                            }
                             void updateStatus({
                               contactId: contact._id as never,
                               dmStatus: status,
@@ -209,13 +152,9 @@ export default function CampaignDetailPage() {
                     <Button
                       size="sm"
                       onClick={() => {
-                        if (sampleDetail) {
-                          toast.success("Sample contact moved to sample deals pipeline");
-                          return;
-                        }
                         void moveToDeals({
                           contactId: contact._id as never,
-                          clientId: selectedClientId!,
+                          clientId: selectedClientId,
                         });
                       }}
                     >
@@ -236,14 +175,6 @@ export default function CampaignDetailPage() {
                     placeholder="Add a quick note"
                     defaultValue={contact.notes || ""}
                     onBlur={(e) => {
-                      if (sampleDetail) {
-                        setSampleContacts((prev) =>
-                          prev.map((item) =>
-                            item._id === contact._id ? { ...item, notes: e.target.value } : item,
-                          ),
-                        );
-                        return;
-                      }
                       void updateStatus({
                         contactId: contact._id as never,
                         dmStatus: contact.dmStatus,

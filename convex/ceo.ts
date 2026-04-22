@@ -162,6 +162,65 @@ export const topGrowth = query({
   },
 });
 
+export const getProfileByClerkId = internalQuery({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) =>
+    ctx.db.query("profile")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .first(),
+});
+
+export const getKpisForReport = internalQuery({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db.query("project")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .collect();
+    const activeProjects = projects.filter((p) => p.status === "active");
+    let totalLeads = 0, totalFollowers = 0, totalReach = 0;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    for (const project of activeProjects) {
+      const metrics = await ctx.db.query("igMetricDaily")
+        .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
+        .collect();
+      if (metrics.length > 0) {
+        const sorted = metrics.sort((a, b) => b.date.localeCompare(a.date));
+        totalFollowers += sorted[0].followers || 0;
+      }
+      const recent = metrics.filter((m) => new Date(m.date) >= sevenDaysAgo);
+      totalReach += recent.reduce((sum, m) => sum + (m.reach || 0), 0);
+      totalLeads += recent.reduce((sum, m) => sum + (m.dmLeads || 0), 0);
+    }
+    return { totalClients: activeProjects.length, totalLeads, totalFollowers, totalReach, avgGrowth: 0 };
+  },
+});
+
+export const getTopGrowthForReport = internalQuery({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db.query("project")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+    const result = await Promise.all(projects.map(async (project) => {
+      const metrics = await ctx.db.query("igMetricDaily")
+        .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
+        .collect();
+      let growthScore = 0;
+      if (metrics.length >= 2) {
+        const sorted = metrics.sort((a, b) => b.date.localeCompare(a.date));
+        const fg = ((sorted[0].followers - sorted[sorted.length - 1].followers) /
+          Math.max(1, sorted[sorted.length - 1].followers)) * 100;
+        growthScore = Math.min(100, Math.round(fg));
+      }
+      return { projectId: project._id, projectName: project.name, instagramHandle: project.instagramHandle, growthScore };
+    }));
+    result.sort((a, b) => b.growthScore - a.growthScore);
+    return result.slice(0, 10);
+  },
+});
+
 /**
  * Generate monthly impact report
  */
@@ -169,103 +228,16 @@ export const monthlyReport = action({
   args: {
     organizationId: v.id("organizations"),
   },
-  handler: async (ctx, args) => {
-    // Verify admin access
+  handler: async (ctx, _args): Promise<{ success: boolean; report: any }> => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
-    }
+    if (!identity) throw new Error("Unauthorized");
 
-    const profile = await ctx.runQuery(async (ctx) => {
-      return await ctx.db
-        .query("profile")
-        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
-        .first();
-    });
+    const profile = await ctx.runQuery(internal.ceo.getProfileByClerkId, { clerkUserId: identity.subject });
+    if (!profile || !hasAdminRole(profile.role ?? "")) throw new Error("Unauthorized: Admin access required");
 
-    if (!profile || !hasAdminRole(profile.role)) {
-      throw new Error("Unauthorized: Admin access required");
-    }
+    const kpis = await ctx.runQuery(internal.ceo.getKpisForReport, { clerkUserId: identity.subject });
+    const topGrowth = await ctx.runQuery(internal.ceo.getTopGrowthForReport, { clerkUserId: identity.subject });
 
-    // Get KPIs (reuse the same logic)
-    const kpis = await ctx.runQuery(async (ctx) => {
-      const projects = await ctx.db
-        .query("project")
-        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
-        .collect();
-
-      const activeProjects = projects.filter((p) => p.status === "active");
-      let totalLeads = 0;
-      let totalFollowers = 0;
-      let totalReach = 0;
-
-      for (const project of activeProjects) {
-        const metrics = await ctx.db
-          .query("igMetricDaily")
-          .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
-          .collect();
-
-        if (metrics.length > 0) {
-          const sorted = metrics.sort((a, b) => b.date.localeCompare(a.date));
-          totalFollowers += sorted[0].followers || 0;
-        }
-
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const recentMetrics = metrics.filter((m) => {
-          const metricDate = new Date(m.date);
-          return metricDate >= sevenDaysAgo;
-        });
-        totalReach += recentMetrics.reduce((sum, m) => sum + (m.reach || 0), 0);
-        totalLeads += recentMetrics.reduce((sum, m) => sum + (m.dmLeads || 0), 0);
-      }
-
-      return {
-        totalClients: activeProjects.length,
-        totalLeads,
-        totalFollowers,
-        totalReach,
-        avgGrowth: 0, // Simplified
-      };
-    });
-
-    // Get top growth
-    const topGrowth = await ctx.runQuery(async (ctx) => {
-      const projects = await ctx.db
-        .query("project")
-        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
-        .filter((q) => q.eq(q.field("status"), "active"))
-        .collect();
-
-      const projectsWithGrowth = await Promise.all(
-        projects.map(async (project) => {
-          const metrics = await ctx.db
-            .query("igMetricDaily")
-            .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
-            .collect();
-
-          let growthScore = 0;
-          if (metrics.length >= 2) {
-            const sorted = metrics.sort((a, b) => b.date.localeCompare(a.date));
-            const followerGrowth = ((sorted[0].followers - sorted[sorted.length - 1].followers) / 
-                                   Math.max(1, sorted[sorted.length - 1].followers)) * 100;
-            growthScore = Math.min(100, Math.round(followerGrowth));
-          }
-
-          return {
-            projectId: project._id,
-            projectName: project.name,
-            instagramHandle: project.instagramHandle,
-            growthScore,
-          };
-        })
-      );
-
-      projectsWithGrowth.sort((a, b) => b.growthScore - a.growthScore);
-      return projectsWithGrowth.slice(0, 10);
-    });
-
-    // Generate report data
     const report = {
       month: new Date().toLocaleString("default", { month: "long", year: "numeric" }),
       kpis,
@@ -273,12 +245,7 @@ export const monthlyReport = action({
       generatedAt: new Date().toISOString(),
     };
 
-    // TODO: Send email via Resend/Twilio
-    // For now, just return the report data
-    return {
-      success: true,
-      report,
-    };
+    return { success: true, report };
   },
 });
 
@@ -323,34 +290,58 @@ export const userKpis = query({
     const projects = await q.collect();
     const activeProjects = projects.filter(p => p.status === "active");
 
-    // Fetch leads for these projects
+    // Fetch lead count across all projects
     let totalLeads = 0;
     for (const project of projects) {
-       const leadsCount = await ctx.db
-         .query("lead")
-         .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
-         .collect();
-       totalLeads += leadsCount.length;
+      const leadsCount = await ctx.db
+        .query("lead")
+        .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
+        .take(1000);
+      totalLeads += leadsCount.length;
     }
 
-    // Sum up followers from latest metrics
+    // Sum followers from latest metric per active project
     let totalFollowers = 0;
     for (const project of activeProjects) {
-       const latestMetric = await ctx.db
-         .query("igMetricDaily")
-         .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
-         .order("desc")
-         .first();
-       if (latestMetric) {
-         totalFollowers += latestMetric.followers;
-       }
+      const latestMetric = await ctx.db
+        .query("igMetricDaily")
+        .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
+        .order("desc")
+        .first();
+      if (latestMetric) {
+        totalFollowers += latestMetric.followers;
+      }
     }
+
+    // Calculate average follower growth % across active projects
+    let totalGrowthScore = 0;
+    let projectsWithGrowth = 0;
+
+    for (const project of activeProjects) {
+      const metrics = await ctx.db
+        .query("igMetricDaily")
+        .withIndex("by_project_id", (q) => q.eq("projectId", project._id))
+        .order("asc")
+        .take(60); // up to 60 days of history
+      if (metrics.length >= 2) {
+        const earliest = metrics[0].followers;
+        const latest = metrics[metrics.length - 1].followers;
+        const pctGrowth = earliest > 0 ? ((latest - earliest) / earliest) * 100 : 0;
+        totalGrowthScore += pctGrowth;
+        projectsWithGrowth++;
+      }
+    }
+
+    const avgGrowth =
+      projectsWithGrowth > 0
+        ? Math.round((totalGrowthScore / projectsWithGrowth) * 100) / 100
+        : 0;
 
     return {
       totalClients: activeProjects.length,
       totalLeads,
       totalFollowers,
-      avgGrowth: 12.4, // Keeping a placeholder for growth calculation for now
+      avgGrowth,
     };
   },
 });

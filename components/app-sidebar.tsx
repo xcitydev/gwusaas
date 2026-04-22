@@ -155,22 +155,25 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
         className,
       )}
     >
-      <div className="flex items-center space-x-2 mb-6">
+      <div className="flex items-center space-x-3 mb-8 px-1">
         {logoUrl ? (
-          <img src={logoUrl} alt={platformName} className="h-8 w-8 rounded-lg object-cover" />
+          <img src={logoUrl} alt={platformName} className="h-9 w-9 rounded-xl object-cover shadow-lg border border-white/5" />
         ) : (
-          <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">{platformName?.charAt(0) || "G"}</span>
+          <div className="w-9 h-9 bg-gradient-to-br from-primary to-orange-500 rounded-xl flex items-center justify-center amber-glow shadow-lg border border-white/10">
+            <span className="text-primary-foreground font-black text-lg">{platformName?.charAt(0) || "G"}</span>
           </div>
         )}
-        <span className="text-foreground font-bold text-xl truncate">{platformName}</span>
+        <span className="text-foreground font-bold text-xl tracking-tight text-gradient">{platformName}</span>
       </div>
 
-      <div className="mb-3 rounded-xl border border-border/80 bg-background/30 p-4">
-        <p className="text-sm font-medium truncate">
-          {user?.fullName || user?.primaryEmailAddress?.emailAddress || "User"}
+      <div className="mb-6 rounded-2xl border border-white/5 bg-white/5 p-4 shadow-sm backdrop-blur-md">
+        <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Active Workspace</p>
+        <p className="text-sm font-bold truncate text-foreground pr-2">
+          {user?.fullName || user?.primaryEmailAddress?.emailAddress || "Workspace User"}
         </p>
-        <Badge className="mt-2">{PLAN_LABELS[userPlan]}</Badge>
+        <Badge className="mt-2 bg-primary/20 text-primary border-primary/20 hover:bg-primary/25 font-bold text-[10px] uppercase">
+          {PLAN_LABELS[userPlan]}
+        </Badge>
       </div>
 
       {!loading ? <ClientSwitcher /> : null}
@@ -191,11 +194,11 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
                 <Link key={`${section.title}-${item.href}-${item.label}`} href={targetHref} onClick={onNavigate}>
                   <div
                     className={cn(
-                      "flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border transition-all duration-150",
+                      "flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border transition-all duration-300",
                       isActive
-                        ? "border-primary/50 bg-primary/10 text-foreground shadow-sm"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/60 hover:border-border/80",
-                      locked && !isActive ? "opacity-90" : "",
+                        ? "border-primary/20 bg-primary/10 text-primary shadow-sm glass-card font-medium"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5 hover:border-white/5",
+                      locked && !isActive ? "opacity-50 grayscale-[0.5]" : "",
                     )}
                   >
                     <span className="flex items-center gap-3">
@@ -203,7 +206,7 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
                       <span className="text-sm">{item.label}</span>
                     </span>
                     {item.soon ? (
-                      <Badge className="h-5 bg-[#2E2312] px-1.5 text-[10px] text-[#FFD166] hover:bg-[#2E2312]">
+                      <Badge className="h-5 bg-indigo-500/10 px-1.5 text-[10px] text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/15">
                         SOON
                       </Badge>
                     ) : null}

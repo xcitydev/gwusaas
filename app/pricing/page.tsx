@@ -3,21 +3,57 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Zap, Sparkles, Trophy, ShieldCheck, Gem } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PLAN_FEATURES, PLAN_LABELS, PLAN_ORDER, normalizePlan, type Plan } from "@/lib/plans";
 import { SERVICES } from "@/lib/services";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 const serviceNamesById = Object.fromEntries(SERVICES.map((service) => [service.id, service.name]));
-const planDescriptions: Record<Plan, string> = {
-  free: "Best for exploring the platform",
-  starter: "Best for early growth systems",
-  growth: "Best for scaling lead generation",
-  elite: "Best for advanced execution teams",
-  white_label: "Best for agency-level white label ops",
+
+const planMetadata: Record<Plan, { description: string; icon: any; recommended?: boolean; tag: string }> = {
+  free: { 
+    description: "Architect the foundation of your content empire.", 
+    icon: Sparkles, 
+    tag: "Explorer" 
+  },
+  starter: { 
+    description: "Launch targeted lead acquisition protocols.", 
+    icon: Zap, 
+    tag: "Operative",
+    recommended: true 
+  },
+  growth: { 
+    description: "Scale communication bandwidth across all nodes.", 
+    icon: Trophy, 
+    tag: "Commander" 
+  },
+  elite: { 
+    description: "Advanced execution for high-clearance operations.", 
+    icon: ShieldCheck, 
+    tag: "Director" 
+  },
+  white_label: { 
+    description: "Full-spectrum agency white-label dominance.", 
+    icon: Gem, 
+    tag: "Partner" 
+  },
+};
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 }
 };
 
 export default function PricingPage() {
@@ -43,13 +79,11 @@ export default function PricingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      if (!res.ok) {
-        throw new Error("Upgrade request failed");
-      }
+      if (!res.ok) throw new Error("Clearance update failed");
       await user?.reload();
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? err.message : "Protocol Error");
     } finally {
       setLoadingPlan(null);
     }
@@ -57,11 +91,11 @@ export default function PricingPage() {
 
   if (!isLoaded) {
     return (
-      <div className="mx-auto w-full max-w-[1400px] px-6 py-10 md:px-10">
-        <Skeleton className="h-12 w-64 mb-8" />
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <Skeleton key={index} className="h-[420px] w-full rounded-2xl" />
+      <div className="mx-auto w-full max-w-7xl px-6 py-20 animate-pulse">
+        <Skeleton className="h-12 w-64 mb-12 bg-white/5 rounded-2xl" />
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-[600px] w-full rounded-[2.5rem] bg-white/5" />
           ))}
         </div>
       </div>
@@ -69,97 +103,137 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 py-10 md:px-10">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight">Pricing</h1>
-          <p className="text-muted-foreground mt-2">Choose a plan and unlock additional GWU services.</p>
+    <div className="mx-auto w-full max-w-7xl px-6 py-20">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-16 text-center space-y-4"
+      >
+        <div className="flex items-center justify-center gap-2 text-primary font-bold text-sm uppercase tracking-widest mb-2">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Clearance Levels</span>
         </div>
-        <Badge className="text-sm px-3 py-1.5">Current: {PLAN_LABELS[currentPlan]}</Badge>
-      </div>
+        <h1 className="text-5xl md:text-6xl font-black tracking-tighter text-white/90">
+          Elevate Your Protocols
+        </h1>
+        <p className="text-muted-foreground text-xl max-w-2xl mx-auto font-medium">
+          Choose your operational bandwidth and unlock advanced AI co-pilots.
+        </p>
+      </motion.div>
 
-      {error ? (
-        <div className="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3">
-          <p className="text-sm text-red-300">{error}</p>
-        </div>
-      ) : null}
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold text-center"
+        >
+          {error}
+        </motion.div>
+      )}
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
+      >
         {PLAN_ORDER.map((plan) => {
           const features = PLAN_FEATURES[plan]
             .map((serviceId) => serviceNamesById[serviceId])
             .filter(Boolean);
+          const meta = planMetadata[plan];
           const isExpanded = expandedPlans[plan];
           const visibleFeatures = isExpanded ? features : features.slice(0, 8);
           const hasMore = features.length > 8;
-
           const isCurrent = currentPlan === plan;
 
           return (
-            <Card
-              key={plan}
-              className="flex min-h-[400px] flex-col rounded-2xl border-border/70 bg-card/70 backdrop-blur"
-            >
-              <CardHeader className="space-y-2 p-6">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-2xl">{PLAN_LABELS[plan]}</CardTitle>
-                  {isCurrent ? <Badge variant="secondary">Current</Badge> : null}
-                </div>
-                <CardDescription className="text-sm">{planDescriptions[plan]}</CardDescription>
-                <p className="text-sm text-muted-foreground">{features.length} unlocked services</p>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-5 p-6 pt-0">
-                <div className="flex-1 rounded-lg border border-border/60 bg-background/40 p-4 space-y-3">
-                  {visibleFeatures.length > 0 ? (
-                    <>
-                      {visibleFeatures.map((feature) => (
-                        <p key={feature} className="text-sm flex items-start gap-2 leading-5">
-                          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                          <span>{feature}</span>
-                        </p>
-                      ))}
-                      {hasMore ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="px-0 h-8 text-sm text-muted-foreground hover:text-foreground"
-                          onClick={() =>
-                            setExpandedPlans((prev) => ({ ...prev, [plan]: !prev[plan] }))
-                          }
-                        >
-                          {isExpanded ? (
-                            <>
-                              Show less <ChevronUp className="h-4 w-4" />
-                            </>
-                          ) : (
-                            <>
-                              Show {features.length - visibleFeatures.length} more <ChevronDown className="h-4 w-4" />
-                            </>
+            <motion.div variants={item} key={plan} className="h-full">
+              <div className={cn(
+                "group relative flex flex-col h-full rounded-[2.5rem] border transition-all duration-500 p-1 bg-white/5 backdrop-blur-xl",
+                meta.recommended ? "border-primary/50 amber-glow scale-105 z-10" : "border-white/5 hover:border-white/10"
+              )}>
+                {meta.recommended && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                    Recommended
+                  </div>
+                )}
+                
+                <div className="p-8 space-y-6 flex-1">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest">{meta.tag}</p>
+                      <h3 className="text-3xl font-black text-white/90 tracking-tight">{PLAN_LABELS[plan]}</h3>
+                    </div>
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center border border-white/10",
+                      meta.recommended ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
+                    )}>
+                      <meta.icon className="w-6 h-6" />
+                    </div>
+                  </div>
+
+                  <p className="text-sm font-medium text-muted-foreground leading-relaxed">
+                    {meta.description}
+                  </p>
+
+                  <div className="space-y-4 pt-4 border-t border-white/5">
+                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Protocol Capabilities</p>
+                    <div className="space-y-3">
+                      {visibleFeatures.length > 0 ? (
+                        <>
+                          {visibleFeatures.map((feature) => (
+                            <div key={feature} className="flex items-start gap-3 group/feat">
+                              <div className="mt-1 w-4 h-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-primary" />
+                              </div>
+                              <span className="text-sm font-bold text-white/70 group-hover/feat:text-white transition-colors">{feature}</span>
+                            </div>
+                          ))}
+                          {hasMore && (
+                            <button
+                              onClick={() => setExpandedPlans(prev => ({ ...prev, [plan]: !prev[plan] }))}
+                              className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2 pt-2 hover:opacity-80 transition-opacity"
+                            >
+                              {isExpanded ? (
+                                <>Contract Features <ChevronUp className="w-3 h-3" /></>
+                              ) : (
+                                <>{features.length - visibleFeatures.length} More Modules <ChevronDown className="w-3 h-3" /></>
+                              )}
+                            </button>
                           )}
-                        </Button>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Core dashboard access included.</p>
-                  )}
+                        </>
+                      ) : (
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 w-4 h-4 rounded-full bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-muted-foreground" />
+                          </div>
+                          <span className="text-sm font-medium text-muted-foreground">Standardized Dashboard Interface</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <Button
-                  className="w-full h-11"
-                  variant={isCurrent ? "secondary" : "default"}
-                  disabled={Boolean(loadingPlan) || isCurrent}
-                  onClick={() => upgrade(plan)}
-                >
-                  {isCurrent
-                    ? "Current Plan"
-                    : loadingPlan === plan
-                      ? "Updating..."
-                      : "Upgrade Plan"}
-                </Button>
-              </CardContent>
-            </Card>
+
+                <div className="p-4">
+                  <Button
+                    onClick={() => upgrade(plan)}
+                    disabled={Boolean(loadingPlan) || isCurrent}
+                    className={cn(
+                      "w-full h-14 rounded-2xl font-black uppercase tracking-widest text-sm transition-all duration-300",
+                      isCurrent 
+                        ? "bg-white/10 text-white/40 cursor-default" 
+                        : meta.recommended ? "amber-glow text-primary-foreground" : "bg-white/10 text-white hover:bg-white/20"
+                    )}
+                  >
+                    {isCurrent ? "Active Deployment" : loadingPlan === plan ? "Updating clearance..." : `Assimilate ${PLAN_LABELS[plan]}`}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 }

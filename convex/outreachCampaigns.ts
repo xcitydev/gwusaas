@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUserProfile } from "./lib/spec";
 import { Id } from "./_generated/dataModel";
+import { encrypt } from "./lib/encryption";
 
 export const create = mutation({
   args: {
@@ -22,11 +23,16 @@ export const create = mutation({
     if (!profile) throw new Error("User profile not found");
 
     const now = Date.now();
+    
+    // Encrypt sensitive data
+    const encryptedPassword = args.instagramPassword ? await encrypt(args.instagramPassword) : undefined;
+    const encryptedBackupCodes = args.backupCodes ? await encrypt(args.backupCodes) : undefined;
+
     const campaignId = await ctx.db.insert("outreachCampaign", {
       clerkUserId: identity.subject,
       instagramUsername: args.instagramUsername,
-      instagramPassword: args.instagramPassword,
-      backupCodes: args.backupCodes,
+      instagramPassword: encryptedPassword,
+      backupCodes: encryptedBackupCodes,
       idealClient: args.idealClient,
       targetAccounts: args.targetAccounts,
       outreachScript: args.outreachScript,
@@ -89,7 +95,18 @@ export const update = mutation({
     const campaign = await ctx.db.get(campaignId);
     if (!campaign || campaign.clerkUserId !== identity.subject) throw new Error("Not found");
 
-    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+    const defined = Object.fromEntries(
+      Object.entries(patch).filter(([, v]) => v !== undefined)
+    );
+
+    // Encrypt if updating sensitive data
+    if (defined.instagramPassword) {
+      defined.instagramPassword = await encrypt(defined.instagramPassword as string);
+    }
+    if (defined.backupCodes) {
+      defined.backupCodes = await encrypt(defined.backupCodes as string);
+    }
+
     await ctx.db.patch(campaignId, { ...defined, updatedAt: Date.now() });
     return { success: true };
   },
