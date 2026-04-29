@@ -10,6 +10,7 @@ export const create = mutation({
     brandElements: v.optional(v.string()),
     aboutUsSummary: v.optional(v.string()),
     googleDriveLink: v.optional(v.string()),
+    logoUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -28,6 +29,7 @@ export const create = mutation({
       brandElements: args.brandElements,
       aboutUsSummary: args.aboutUsSummary,
       googleDriveLink: args.googleDriveLink,
+      logoUrl: args.logoUrl,
       createdBy: profile._id as Id<"profile">,
       createdAt: now,
       updatedAt: now,

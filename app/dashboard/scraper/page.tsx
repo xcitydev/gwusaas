@@ -276,10 +276,10 @@ export default function ScraperPage() {
                     isLocked={true}
                     title={`Unlock ${lockedRows.length} Shadow Leads`}
                     description={`Your ${userPlan} clearance level allows viewing ${visibleLimit} nodes per cycle. Access all ${lockedRows.length} remaining leads.`}
-                    className="mt-6 shadow-2xl"
+                    className="mt-6 shadow-card"
                   >
                     {/* Placeholder content for overlay blur */}
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 opacity-20">
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 shadow-card opacity-20">
                       <div className="h-4 w-32 bg-white/10 rounded mb-2" />
                       <div className="h-3 w-48 bg-white/10 rounded" />
                     </div>

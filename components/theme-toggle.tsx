@@ -11,7 +11,7 @@ export function ThemeToggle() {
   return (
     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
         onClick={() => setTheme(theme === "light" ? "dark" : "light")}
         className="relative overflow-hidden"

@@ -12,7 +12,7 @@ const SideBar = ({ children }: { children: React.ReactNode }) => {
   const { platformName } = useWhitelabel();
 
   return (
-    <div className="min-h-screen w-full bg-background lg:flex">
+    <div className="min-h-screen w-full gradient-bg lg:flex">
       <div className="hidden lg:block">
         <AppSidebar />
       </div>

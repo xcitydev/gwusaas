@@ -35,7 +35,12 @@ export async function POST(req: Request) {
       requestedPlan as string,
     );
 
-    if (requiresVerification && !isValidTestToken) {
+    // Bypass verification in non-production OR if specific flag is set
+    const shouldBypassVerification = 
+      process.env.NODE_ENV === "development" || 
+      process.env.SKIP_BILLING_VERIFICATION === "true";
+
+    if (requiresVerification && !isValidTestToken && !shouldBypassVerification) {
       return NextResponse.json(
         { error: "Payment verification required for this plan" },
         { status: 402 },
@@ -73,8 +78,11 @@ export async function POST(req: Request) {
       plan,
       message: `Plan updated to ${plan}. Changes take effect immediately.`,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to update billing plan", error);
+    if (error.clerkError) {
+      console.error("Clerk Error Details:", JSON.stringify(error.errors, null, 2));
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

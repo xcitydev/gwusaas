@@ -26,6 +26,7 @@ import {
   Users,
   UserRoundCog,
   WalletCards,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ import { hasAccess, normalizePlan, PLAN_LABELS, type Plan } from "@/lib/plans";
 import { useWhitelabel } from "@/context/WhitelabelContext";
 import { useClientContext } from "@/context/ClientContext";
 import { ClientSwitcher } from "@/components/layout/ClientSwitcher";
+import { ThemeToggle } from "./theme-toggle";
 
 type NavItem = {
   label: string;
@@ -174,9 +176,11 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
         <p className="text-sm font-bold truncate text-foreground pr-2">
           {user?.fullName || user?.primaryEmailAddress?.emailAddress || "Workspace User"}
         </p>
-        <Badge className="mt-2 bg-primary/20 text-primary border-primary/20 hover:bg-primary/25 font-bold text-[10px] uppercase">
-          {PLAN_LABELS[userPlan]}
-        </Badge>
+        <Link href="/pricing">
+          <Badge className="mt-2 bg-primary/20 text-primary border-primary/20 hover:bg-primary/25 font-bold text-[10px] uppercase cursor-pointer transition-colors">
+            {PLAN_LABELS[userPlan]} — Upgrade
+          </Badge>
+        </Link>
       </div>
 
       {!loading ? <ClientSwitcher /> : null}
@@ -222,7 +226,21 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
         ))}
       </div>
 
-      <div className="pt-3 border-t border-border/80">
+      <div className="pt-3 border-t border-border/80 space-y-2">
+        <div className="flex items-center justify-between px-2 mb-1">
+          <span className="text-xs font-medium text-muted-foreground">Appearance</span>
+          <ThemeToggle />
+        </div>
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-muted-foreground hover:text-foreground h-10"
+          asChild
+        >
+          <Link href="/pricing" onClick={onNavigate}>
+            <CreditCard className="w-5 h-5 mr-3" />
+            Pricing & Plans
+          </Link>
+        </Button>
         <Button
           variant="ghost"
           className="w-full justify-start text-muted-foreground hover:text-foreground h-10"

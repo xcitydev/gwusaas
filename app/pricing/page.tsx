@@ -11,6 +11,7 @@ import { PLAN_FEATURES, PLAN_LABELS, PLAN_ORDER, normalizePlan, type Plan } from
 import { SERVICES } from "@/lib/services";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const serviceNamesById = Object.fromEntries(SERVICES.map((service) => [service.id, service.name]));
 
@@ -79,9 +80,13 @@ export default function PricingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      if (!res.ok) throw new Error("Clearance update failed");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Clearance update failed");
+      }
       await user?.reload();
-      router.refresh();
+      toast.success(`Clearance Level: ${PLAN_LABELS[plan]} Activated`);
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Protocol Error");
     } finally {

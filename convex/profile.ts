@@ -86,3 +86,22 @@ export const completeOnboarding = mutation({
   },
 });
 
+export const resetOnboarding = mutation({
+  args: {
+    clerkUserId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const profile = await ctx.db
+      .query("profile")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .first();
+
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    await ctx.db.patch(profile._id, {
+      onboardingCompleted: false,
+    });
+  },
+});
+

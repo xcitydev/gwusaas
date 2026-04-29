@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { ClientProvider } from "@/context/ClientContext";
 
 export default async function OnboardingLayout({
   children,
@@ -13,5 +14,5 @@ export default async function OnboardingLayout({
     return redirectToSignIn();
   }
 
-  return <>{children}</>;
+  return <ClientProvider>{children}</ClientProvider>;
 }

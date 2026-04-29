@@ -162,6 +162,7 @@ export default defineSchema({
     brandElements: v.optional(v.string()), // Brand elements needed
     aboutUsSummary: v.optional(v.string()), // About Us/Team page content
     googleDriveLink: v.optional(v.string()), // Google Drive folder with assets
+    logoUrl: v.optional(v.string()), // Company logo as base64 string
     assignedDeveloper: v.optional(v.string()),
     deadline: v.optional(v.string()),
     url: v.optional(v.string()),
@@ -181,10 +182,16 @@ export default defineSchema({
     instagramPassword: v.optional(v.string()), // Encrypted in production
     backupCodes: v.optional(v.string()), // Encrypted in production
     idealClient: v.optional(v.string()), // Description of ideal avatar client
+    targetLocations: v.optional(v.string()), // Specific to Real Estate
     targetAccounts: v.optional(v.array(v.string())), // List of @handles
     outreachScript: v.optional(v.string()), // Ideal script for reaching out
     allowFollow: v.boolean(), // Allow following target accounts
     enableEngagement: v.boolean(), // Free engagement service
+    campaignType: v.optional(v.string()), // "real-estate" | "general" | "mass-dm"
+    dmCount: v.optional(v.string()), // Specific to mass-dm
+    contactEmail: v.optional(v.string()), // Specific to mass-dm
+    contactPhone: v.optional(v.string()), // Specific to mass-dm
+    comments: v.optional(v.string()), // Specific to mass-dm
     status: v.string(), // "setup" | "active" | "paused" | "completed"
     createdBy: v.id("profile"),
     createdAt: v.number(),

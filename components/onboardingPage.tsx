@@ -723,7 +723,7 @@ export default function OnboardingPage() {
           transition={{ duration: 0.6, delay: 0.5 }}
         >
           <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-            <Card className="bg-card/80 backdrop-blur-sm border-border shadow-2xl">
+            <Card className="glass-card border-border shadow-card">
               <CardHeader>
                 <CardTitle className="text-2xl text-card-foreground flex items-center">
                   <motion.div
