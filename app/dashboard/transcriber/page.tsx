@@ -46,8 +46,8 @@ type ProgressStep = {
 
 const STEPS: ProgressStep[] = [
   { key: "detect", label: "Detecting platform" },
-  { key: "extract", label: "Extracting audio" },
-  { key: "transcribe", label: "Transcribing with Whisper" },
+  { key: "extract", label: "Fetching captions or audio" },
+  { key: "transcribe", label: "Transcribing" },
   { key: "done", label: "Done" },
 ];
 
@@ -344,7 +344,7 @@ export default function TranscriberPage() {
                 <Button
                   onClick={() => void runTranscription()}
                   disabled={!url.trim()}
-                  className="bg-amber-500 text-black hover:bg-amber-400 disabled:bg-amber-500/30 disabled:text-black/50"
+                  className="bg-amber-500 mx-2 text-black hover:bg-amber-400 disabled:bg-amber-500/30 disabled:text-black/50"
                 >
                   Transcribe
                 </Button>

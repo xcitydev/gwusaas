@@ -8,11 +8,6 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as actions_generateLeadProfile from "../actions/generateLeadProfile.js";
 import type * as actions_refineTranscript from "../actions/refineTranscript.js";
 import type * as actions_transcribe from "../actions/transcribe.js";
@@ -48,6 +43,7 @@ import type * as userApiKeys from "../userApiKeys.js";
 import type * as users from "../users.js";
 import type * as videoProjects from "../videoProjects.js";
 import type * as viralWorkspace from "../viralWorkspace.js";
+import type * as voiceCaller from "../voiceCaller.js";
 import type * as waitlist from "../waitlist.js";
 import type * as webhook from "../webhook.js";
 import type * as websiteProjects from "../websiteProjects.js";
@@ -65,7 +61,6 @@ declare const fullApi: ApiFromModules<{
   "actions/transcribe": typeof actions_transcribe;
   ai: typeof ai;
   aiHistory: typeof aiHistory;
-  approvals: typeof approvals;
   analytics: typeof analytics;
   approvals: typeof approvals;
   audit: typeof audit;
@@ -91,14 +86,12 @@ declare const fullApi: ApiFromModules<{
   scheduledFunctions: typeof scheduledFunctions;
   settings: typeof settings;
   support: typeof support;
-  userApiKeys: typeof userApiKeys;
-  support: typeof support;
   usage: typeof usage;
   userApiKeys: typeof userApiKeys;
   users: typeof users;
-  viralWorkspace: typeof viralWorkspace;
   videoProjects: typeof videoProjects;
   viralWorkspace: typeof viralWorkspace;
+  voiceCaller: typeof voiceCaller;
   waitlist: typeof waitlist;
   webhook: typeof webhook;
   websiteProjects: typeof websiteProjects;

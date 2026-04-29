@@ -31,41 +31,92 @@ function dedupe(values: Array<string | undefined>) {
   });
 }
 
+function normalizeActorId(actorId: string): string {
+  return actorId.trim().replace(/\//g, "~");
+}
+
 function getActorCandidates(url: string, actorId?: string) {
   const lower = url.toLowerCase();
+
+  const googleMaps = ["compass~crawler-google-places", "compass~google-maps-scraper"];
+  const instagram = ["apify~instagram-profile-scraper", "apify~instagram-scraper"];
+  const facebook = ["apify~facebook-pages-scraper"];
+  const linkedin = ["apify~linkedin-company-scraper"];
+  const genericWeb = ["apify~website-content-crawler"];
+
   const defaults = [
     process.env.APIFY_DEFAULT_ACTOR_ID,
-    "apify/google-maps-scraper",
-    "apify/instagram-scraper",
-    "apify/facebook-pages-scraper",
-    "apify/linkedin-company-scraper",
-    "apify/website-content-crawler",
+    ...genericWeb,
   ];
 
-  const googleMaps = ["apify/google-maps-scraper", "apify/website-content-crawler"];
-  const social = [
-    "apify/linkedin-company-scraper",
-    "apify/instagram-scraper",
-    "apify/facebook-pages-scraper",
-  ];
+  const override = actorId ? normalizeActorId(actorId) : undefined;
 
   if (
     lower.includes("google.com/maps") ||
     lower.includes("maps.google") ||
     lower.includes("g.page")
   ) {
-    return dedupe([actorId, ...googleMaps, ...defaults]);
+    return dedupe([override, ...googleMaps, ...defaults]);
   }
 
-  if (
-    lower.includes("linkedin.com") ||
-    lower.includes("instagram.com") ||
-    lower.includes("facebook.com")
-  ) {
-    return dedupe([actorId, ...social, ...defaults]);
+  if (lower.includes("instagram.com")) {
+    return dedupe([override, ...instagram, ...defaults]);
   }
 
-  return dedupe([actorId, ...defaults]);
+  if (lower.includes("linkedin.com")) {
+    return dedupe([override, ...linkedin, ...defaults]);
+  }
+
+  if (lower.includes("facebook.com")) {
+    return dedupe([override, ...facebook, ...defaults]);
+  }
+
+  return dedupe([override, ...defaults]);
+}
+
+function buildActorInput(
+  actorId: string,
+  url: string,
+  maxItems: number,
+): Record<string, unknown> {
+  const normalized = actorId.toLowerCase();
+
+  if (normalized.includes("google-places") || normalized.includes("google-maps")) {
+    let searchString = "";
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname.includes("google.")) {
+        const m = parsed.pathname.match(/\/maps\/search\/([^/]+)/);
+        if (m?.[1]) searchString = decodeURIComponent(m[1]).replace(/\+/g, " ");
+      }
+    } catch {}
+    return {
+      searchStringsArray: searchString ? [searchString] : [url],
+      maxCrawledPlacesPerSearch: maxItems,
+      language: "en",
+    };
+  }
+
+  if (normalized.includes("instagram-profile")) {
+    return {
+      usernames: [url.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").split("/")[0]],
+      resultsLimit: maxItems,
+    };
+  }
+
+  if (normalized.includes("instagram-scraper") || normalized.includes("instagram-hashtag")) {
+    return {
+      directUrls: [url],
+      resultsLimit: maxItems,
+    };
+  }
+
+  return {
+    startUrls: [{ url }],
+    maxCrawlPages: maxItems,
+    maxResults: maxItems,
+    maxItems,
+  };
 }
 
 async function scrapeWithApify(
@@ -88,22 +139,28 @@ async function scrapeWithApify(
   let lastError = "Apify scrape failed";
 
   for (const candidate of candidates) {
+    const normalized = normalizeActorId(candidate);
+    const input = buildActorInput(normalized, url, maxItems);
+
     const response = await fetch(
-      `https://api.apify.com/v2/acts/${candidate}/run-sync-get-dataset-items?token=${token}`,
+      `https://api.apify.com/v2/acts/${normalized}/run-sync-get-dataset-items?token=${token}&memory=1024`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startUrls: [{ url }],
-          maxItems,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(input),
       },
     );
 
     const raw = await response.text();
     if (!response.ok) {
-      lastError = `Apify actor ${candidate} failed (${response.status}): ${raw}`;
-      console.warn("Apify actor candidate failed", { candidate, status: response.status });
+      lastError = `Apify actor ${normalized} failed (${response.status}): ${raw.slice(0, 300)}`;
+      console.warn("Apify actor candidate failed", {
+        candidate: normalized,
+        status: response.status,
+      });
       continue;
     }
 
@@ -111,7 +168,7 @@ async function scrapeWithApify(
     const items = Array.isArray(parsed) ? parsed : [parsed];
     const limited = items.slice(0, maxItems);
     return {
-      selectedActor: candidate,
+      selectedActor: normalized,
       scraped: JSON.stringify(limited),
     };
   }
@@ -120,7 +177,7 @@ async function scrapeWithApify(
 }
 
 const extractSystemPrompt =
-  "You are a lead intelligence analyst. Return JSON array of up to 50 lead objects. Each object must include: company, contactName, contactRole, email, phone, website, location, painPoint, outreachAngle, confidence (1-100), sourceEvidence. Use only evidence from scraped content. If a field is missing, use empty string.";
+  "You are a lead intelligence analyst. Return JSON array of up to 50 lead objects. Each object must include: company, contactName, contactRole, email, phone, website, linkedin, location, painPoint, outreachAngle, confidence (1-100), sourceEvidence. Use only evidence from scraped content. If a field is missing, use empty string.";
 
 export async function POST(req: Request) {
   try {
@@ -188,6 +245,7 @@ export async function POST(req: Request) {
         email: String(row.email ?? ""),
         phone: String(row.phone ?? ""),
         website: String(row.website ?? ""),
+        linkedin: String(row.linkedin ?? row.linkedinUrl ?? row.linkedIn ?? ""),
         location: String(row.location ?? ""),
         painPoint: String(row.painPoint ?? ""),
         outreachAngle: String(row.outreachAngle ?? ""),

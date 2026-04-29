@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const faqs = [
   {
     q: "When is this launching?",
-    a: "We're targeting Q2 2026 for early access. Waitlist members get priority.",
+    a: "We're targeting Q3 2026 for early access. Waitlist members get priority.",
   },
   {
     q: "Is this the same as the AI Studio?",

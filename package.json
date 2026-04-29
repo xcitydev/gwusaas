@@ -11,6 +11,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@clerk/nextjs": "^6.30.0",
+    "@deepgram/sdk": "^5.0.0",
+    "@distube/ytdl-core": "^4.16.12",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.1",
     "@pinecone-database/pinecone": "^6.1.2",
@@ -26,6 +28,7 @@
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@supabase/supabase-js": "^2.104.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.26.2",
@@ -42,6 +45,8 @@
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
+    "twilio": "^6.0.0",
+    "ws": "^8.20.0",
     "zod": "^4.0.17"
   },
   "devDependencies": {
@@ -50,6 +55,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "tailwindcss": "^4",

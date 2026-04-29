@@ -642,4 +642,84 @@ export default defineSchema({
     count: v.number(),
   })
     .index("by_user_metric_date", ["clerkUserId", "metric", "date"]),
+
+  // AI Voice Qualifier — cloned voices per client
+  voiceClones: defineTable({
+    clientId: v.string(), // Clerk user ID
+    voiceId: v.string(), // ElevenLabs voice_id
+    voiceName: v.string(),
+    sampleUrl: v.string(), // Supabase Storage URL of original sample
+    createdAt: v.number(),
+  })
+    .index("by_client_id", ["clientId"])
+    .index("by_voice_id", ["voiceId"]),
+
+  // AI Voice Qualifier — outbound call campaigns
+  callCampaigns: defineTable({
+    clientId: v.string(),
+    voiceId: v.string(),
+    scriptText: v.string(),
+    audioUrl: v.optional(v.string()),
+    callType: v.union(v.literal("live"), v.literal("voicemail")),
+    // Calling engine: "internal" = legacy Twilio/Slybroadcast pipeline,
+    // "vapi" = managed pipeline via api.vapi.ai. Optional/legacy = "internal".
+    provider: v.optional(v.union(v.literal("internal"), v.literal("vapi"))),
+    leads: v.array(
+      v.object({
+        phone: v.string(),
+        name: v.string(),
+        company: v.optional(v.string()),
+        email: v.optional(v.string()),
+      }),
+    ),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("running"),
+      v.literal("complete"),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_client_id", ["clientId"])
+    .index("by_client_id_created_at", ["clientId", "createdAt"]),
+
+  // AI Voice Qualifier — per-lead call outcome logs
+  callLogs: defineTable({
+    campaignId: v.id("callCampaigns"),
+    clientId: v.string(),
+    leadPhone: v.string(),
+    leadName: v.string(),
+    outcome: v.union(
+      v.literal("qualified"),
+      v.literal("not_qualified"),
+      v.literal("no_answer"),
+      v.literal("failed"),
+    ),
+    qualScore: v.number(), // 0–4
+    signals: v.object({
+      budget: v.boolean(),
+      decision: v.boolean(),
+      problem: v.boolean(),
+      booked: v.boolean(),
+    }),
+    transcript: v.array(
+      v.object({
+        role: v.union(v.literal("agent"), v.literal("lead")),
+        text: v.string(),
+        ts: v.string(),
+        signal: v.optional(v.string()),
+      }),
+    ),
+    summary: v.optional(v.string()),
+    duration: v.optional(v.string()),
+    callSid: v.optional(v.string()),
+    provider: v.optional(v.union(v.literal("internal"), v.literal("vapi"))),
+    vapiCallId: v.optional(v.string()),
+    recordingUrl: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_client_id", ["clientId"])
+    .index("by_campaign_id", ["campaignId"])
+    .index("by_call_sid", ["callSid"])
+    .index("by_vapi_call_id", ["vapiCallId"])
+    .index("by_client_id_created_at", ["clientId", "createdAt"]),
 });

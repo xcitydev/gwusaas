@@ -2,6 +2,7 @@ export type Platform =
   | "youtube"
   | "instagram"
   | "tiktok"
+  | "facebook"
   | "twitter"
   | "loom"
   | "spotify"
@@ -13,6 +14,7 @@ export function detectPlatform(url: string): Platform {
   if (/youtube\.com|youtu\.be/.test(url)) return "youtube";
   if (/instagram\.com/.test(url)) return "instagram";
   if (/tiktok\.com/.test(url)) return "tiktok";
+  if (/facebook\.com|fb\.watch|fb\.com/.test(url)) return "facebook";
   if (/twitter\.com|x\.com/.test(url)) return "twitter";
   if (/loom\.com/.test(url)) return "loom";
   if (/spotify\.com/.test(url)) return "spotify";
@@ -25,6 +27,7 @@ export function getPlatformLabel(platform: Platform): string {
     youtube: "YouTube",
     instagram: "Instagram Reel",
     tiktok: "TikTok",
+    facebook: "Facebook",
     twitter: "X / Twitter",
     loom: "Loom",
     spotify: "Spotify Podcast",
@@ -39,6 +42,7 @@ export function getPlatformEmoji(platform: Platform): string {
     youtube: "🎬",
     instagram: "📸",
     tiktok: "🎵",
+    facebook: "📘",
     twitter: "🐦",
     loom: "🎥",
     spotify: "🎙️",
