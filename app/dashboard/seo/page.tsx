@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +28,38 @@ type CompetitorResult = {
   contentGaps?: string[];
   backlinkStrategyRecommendations?: string[];
   overallCompetitiveThreatScore?: number;
+};
+
+type AiSearchOptimizeContentBlock = {
+  question: string;
+  directAnswer: string;
+  expanded: string;
+  bullets?: string[];
+};
+
+type AiSearchOptimizeQueryRow = {
+  query: string;
+  answer: string;
+  contentBlock: AiSearchOptimizeContentBlock;
+};
+
+type AiSearchOptimizeResult = {
+  queries: AiSearchOptimizeQueryRow[];
+  authority: {
+    credibility: string[];
+    differentiators: string[];
+    trustSignals: string[];
+  };
+  faqs: { question: string; answer: string }[];
+  externalSignals: {
+    websites: string[];
+    platforms: string[];
+    prStrategies: string[];
+  };
+  visibilityScore: {
+    score: number;
+    explanation: string;
+  };
 };
 
 type JsonObject = Record<string, unknown>;
@@ -550,6 +583,15 @@ export default function SeoHubPage() {
   const [competitorError, setCompetitorError] = useState<string | null>(null);
   const [competitor, setCompetitor] = useState<CompetitorResult | null>(null);
 
+  const [asoBusinessName, setAsoBusinessName] = useState("");
+  const [asoIndustry, setAsoIndustry] = useState("");
+  const [asoAudience, setAsoAudience] = useState("");
+  const [asoLocation, setAsoLocation] = useState("");
+  const [asoServices, setAsoServices] = useState("");
+  const [asoLoading, setAsoLoading] = useState(false);
+  const [asoError, setAsoError] = useState<string | null>(null);
+  const [asoResult, setAsoResult] = useState<AiSearchOptimizeResult | null>(null);
+
   const runAudit = async () => {
     setAuditLoading(true);
     setAuditError(null);
@@ -629,6 +671,57 @@ export default function SeoHubPage() {
     }
   };
 
+  const runAiSearchOptimize = async () => {
+    setAsoLoading(true);
+    setAsoError(null);
+    setAsoResult(null);
+    try {
+      const body: {
+        businessName: string;
+        industry: string;
+        audience: string;
+        services: string;
+        location?: string;
+      } = {
+        businessName: asoBusinessName.trim(),
+        industry: asoIndustry.trim(),
+        audience: asoAudience.trim(),
+        services: asoServices.trim(),
+      };
+      const loc = asoLocation.trim();
+      if (loc) body.location = loc;
+
+      const res = await fetch("/api/ai-search-optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const payload = (await res.json().catch(() => null)) as
+        | AiSearchOptimizeResult
+        | { error?: string; details?: unknown }
+        | null;
+
+      if (!res.ok) {
+        const msg =
+          payload && "error" in payload && typeof payload.error === "string"
+            ? payload.error
+            : "Failed to run AI search optimization";
+        throw new Error(msg);
+      }
+
+      if (!payload || !("queries" in payload)) {
+        throw new Error("Invalid response from server");
+      }
+
+      setAsoResult(payload as AiSearchOptimizeResult);
+    } catch (error) {
+      setAsoError(error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setAsoLoading(false);
+    }
+  };
+
   const sortedKeywords = useMemo(() => {
     const values = [...keywords];
     if (sortField === "keyword") {
@@ -657,6 +750,7 @@ export default function SeoHubPage() {
           <TabsList className="flex flex-wrap h-auto">
             <TabsTrigger value="audit">Audit</TabsTrigger>
             <TabsTrigger value="keywords">Keywords</TabsTrigger>
+            <TabsTrigger value="ai-search">AI search</TabsTrigger>
             <TabsTrigger value="technical">Technical</TabsTrigger>
             <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
             <TabsTrigger value="competitor">Competitor</TabsTrigger>
@@ -765,6 +859,231 @@ export default function SeoHubPage() {
                         ))}
                       </TableBody>
                     </Table>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </PlanGate>
+          </TabsContent>
+
+          <TabsContent value="ai-search">
+            <PlanGate requiredPlan="starter">
+              <Card>
+                <CardHeader>
+                  <CardTitle>AI search optimization</CardTitle>
+                  <CardDescription>
+                    Queries, answers, and authority signals aimed at ChatGPT, Perplexity, and Google AI
+                    recommendations.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="asoBusinessName">Business name</Label>
+                      <Input
+                        id="asoBusinessName"
+                        value={asoBusinessName}
+                        onChange={(e) => setAsoBusinessName(e.target.value)}
+                        placeholder="Acme Co."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="asoIndustry">Industry</Label>
+                      <Input
+                        id="asoIndustry"
+                        value={asoIndustry}
+                        onChange={(e) => setAsoIndustry(e.target.value)}
+                        placeholder="Home services"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="asoAudience">Target audience</Label>
+                      <Input
+                        id="asoAudience"
+                        value={asoAudience}
+                        onChange={(e) => setAsoAudience(e.target.value)}
+                        placeholder="Homeowners in metro areas"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="asoLocation">Location (optional)</Label>
+                      <Input
+                        id="asoLocation"
+                        value={asoLocation}
+                        onChange={(e) => setAsoLocation(e.target.value)}
+                        placeholder="Austin, TX"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="asoServices">Services / products</Label>
+                      <Textarea
+                        id="asoServices"
+                        value={asoServices}
+                        onChange={(e) => setAsoServices(e.target.value)}
+                        placeholder="List main offerings…"
+                        rows={4}
+                        className="resize-y min-h-[100px]"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    disabled={
+                      !asoBusinessName.trim() ||
+                      !asoIndustry.trim() ||
+                      !asoAudience.trim() ||
+                      !asoServices.trim() ||
+                      asoLoading
+                    }
+                    onClick={runAiSearchOptimize}
+                  >
+                    {asoLoading ? "Generating…" : "Generate AI search pack"}
+                  </Button>
+                  {asoLoading ? <Skeleton className="h-48 w-full" /> : null}
+                  {asoError ? <p className="text-sm text-red-500">{asoError}</p> : null}
+                  {!asoLoading && !asoError && !asoResult ? (
+                    <p className="text-sm text-muted-foreground">
+                      Fill in business details, then generate a structured pack for AI answer surfaces.
+                    </p>
+                  ) : null}
+                  {asoResult ? (
+                    <div className="space-y-6 pt-2">
+                      <div
+                        className="rounded-[12px] border p-5 md:flex md:items-center md:justify-between md:gap-6"
+                        style={{
+                          borderColor: "rgba(255,255,255,0.08)",
+                          backgroundColor: "rgba(255,255,255,0.02)",
+                        }}
+                      >
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wider text-amber-400/90">
+                            Visibility score
+                          </p>
+                          <p className="mt-1 text-4xl font-bold tabular-nums">
+                            {asoResult.visibilityScore.score}
+                            <span className="text-lg font-normal text-muted-foreground"> / 100</span>
+                          </p>
+                        </div>
+                        <p className="mt-3 text-sm text-muted-foreground md:mt-0 md:max-w-xl md:text-right">
+                          {asoResult.visibilityScore.explanation}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                          Queries & answers
+                        </h3>
+                        <div className="space-y-4">
+                          {asoResult.queries.map((row, idx) => (
+                            <div
+                              key={`${row.query}-${idx}`}
+                              className="rounded-lg border border-white/10 bg-card/40 p-4"
+                            >
+                              <p className="font-medium text-foreground">{row.query}</p>
+                              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                                {row.answer}
+                              </p>
+                              <div className="mt-4 rounded-md border border-white/5 bg-black/20 p-3 text-sm">
+                                <p className="text-xs font-semibold uppercase text-amber-500/90">
+                                  Content block
+                                </p>
+                                <p className="mt-2 font-medium">{row.contentBlock.question}</p>
+                                <p className="mt-1 text-muted-foreground">{row.contentBlock.directAnswer}</p>
+                                <p className="mt-2 text-muted-foreground">{row.contentBlock.expanded}</p>
+                                {row.contentBlock.bullets && row.contentBlock.bullets.length > 0 ? (
+                                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                                    {row.contentBlock.bullets.map((b, bi) => (
+                                      <li key={`${idx}-b-${bi}`}>{b}</li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Credibility</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {asoResult.authority.credibility.map((item, i) => (
+                              <p key={`cred-${i}`}>• {item}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Differentiators</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {asoResult.authority.differentiators.map((item, i) => (
+                              <p key={`diff-${i}`}>• {item}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Trust signals</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {asoResult.authority.trustSignals.map((item, i) => (
+                              <p key={`trust-${i}`}>• {item}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      <div>
+                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                          FAQs
+                        </h3>
+                        <div className="space-y-3">
+                          {asoResult.faqs.map((faq, fi) => (
+                            <div
+                              key={`faq-${fi}`}
+                              className="rounded-lg border border-white/10 p-4"
+                            >
+                              <p className="font-medium">{faq.question}</p>
+                              <p className="mt-2 text-sm text-muted-foreground">{faq.answer}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Websites</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {asoResult.externalSignals.websites.map((w, i) => (
+                              <p key={`web-${i}`}>• {w}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Platforms</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {asoResult.externalSignals.platforms.map((p, i) => (
+                              <p key={`plat-${i}`}>• {p}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">PR strategies</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {asoResult.externalSignals.prStrategies.map((s, i) => (
+                              <p key={`pr-${i}`}>• {s}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
                   ) : null}
                 </CardContent>
               </Card>
