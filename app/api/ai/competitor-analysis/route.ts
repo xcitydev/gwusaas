@@ -11,7 +11,11 @@ const bodySchema = z.object({
 });
 
 const systemPrompt =
-  "You are an expert digital marketing strategist. Compare these two websites and return JSON with: strengths of competitor, weaknesses of competitor, opportunities we can exploit, keyword gaps, content gaps, backlink strategy recommendations, and an overall competitive threat score (1-10).";
+  "You are an expert digital marketing strategist. Compare these two websites and return a structured JSON response. " +
+  "Use these exact keys: 'strengthsOfCompetitor' (array of strings), 'weaknessesOfCompetitor' (array of strings), " +
+  "'opportunitiesWeCanExploit' (array of strings), 'keywordGaps' (array of strings), 'contentGaps' (array of strings), " +
+  "'backlinkStrategyRecommendations' (array of strings), and 'overallCompetitiveThreatScore' (number 1-10). " +
+  "Be analytical, specific, and data-driven based on the provided content.";
 
 export async function POST(req: Request) {
   try {

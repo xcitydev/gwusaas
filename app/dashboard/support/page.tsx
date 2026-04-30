@@ -359,7 +359,16 @@ export default function SupportPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Start Chat</Button>
+                  <Button 
+                    className="w-full"
+                    onClick={() => {
+                      toast.info("Live Chat is currently offline. Please create a support ticket or email us.", {
+                        description: "Our team is available 9 AM - 6 PM EST.",
+                      });
+                    }}
+                  >
+                    Start Chat
+                  </Button>
                   <p className="text-xs text-muted-foreground mt-2">
                     Available 9 AM - 6 PM EST
                   </p>
@@ -395,8 +404,8 @@ export default function SupportPage() {
                   <CardDescription>Call us for urgent issues</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="outline" className="w-full">
-                    +1 (888) 555-0199
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href="tel:+18885550199">+1 (888) 555-0199</a>
                   </Button>
                   <p className="text-xs text-muted-foreground mt-2">
                     Available 24/7 for urgent issues

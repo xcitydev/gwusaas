@@ -3,24 +3,21 @@ import { z } from "zod";
 import { getAiErrorMessage, sseResponse, streamClaudeJson } from "@/lib/ai";
 import { scrapeUrl } from "@/lib/firecrawl";
 import { requirePlan } from "@/lib/route-auth";
-import { saveSeoAuditHistory } from "@/lib/convex-history";
 
 const bodySchema = z.object({
   url: z.string().min(1),
 });
 
 const systemPrompt =
-  "You are an expert SEO auditor. Analyze the following webpage content and return a structured JSON SEO audit. " +
-  "For each section (title_tag, meta_description, headings, keyword_density, internal_linking, page_speed, mobile_friendliness, schema_markup), " +
-  "provide an object with these fields: 'score' (number 0-10), 'present' (boolean), 'content' (string, optional), 'issues' (array of strings), and 'recommendations' (array of strings). " +
-  "Also include a top-level 'overall_score' field (number 0-100). Be specific, technical, and actionable.";
+  "You are a Technical SEO expert. Analyze the following webpage content and provide a detailed technical SEO report in JSON format. " +
+  "Focus on: indexing (robots meta, canonicals), performance (speed recommendations based on content size), security (HTTPS), mobile-friendliness, and architecture (URL structure, breadcrumbs). " +
+  "For each category (indexing, performance, security, mobile, architecture, crawlers), " +
+  "provide an object with: 'score' (0-10), 'status' (string like 'Good', 'Action Required', 'Warning'), 'issues' (array), and 'recommendations' (array). " +
+  "Also include an 'overall_score' (0-100). Be technical and specific.";
 
 function normalizeUrl(input: string) {
   const raw = input.trim();
-  if (!raw) {
-    throw new Error("URL is required");
-  }
-
+  if (!raw) throw new Error("URL is required");
   try {
     return new URL(raw).toString();
   } catch {
@@ -34,10 +31,8 @@ function normalizeUrl(input: string) {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePlan("starter");
-    if (!guard.ok) {
-      return guard.response;
-    }
+    const guard = await requirePlan("growth");
+    if (!guard.ok) return guard.response;
 
     const parsed = bodySchema.safeParse(await req.json());
     if (!parsed.success) {
@@ -58,28 +53,13 @@ export async function POST(req: Request) {
           content: `URL: ${normalizedUrl}\n\nScraped Content:\n${pageContent}`,
         },
       ],
-      onComplete: async (fullText) => {
-        let result: unknown = fullText;
-        try {
-          result = JSON.parse(fullText);
-        } catch {
-          // Fallback to raw text if model returns invalid JSON.
-        }
-
-        await saveSeoAuditHistory({
-          userId: guard.userId,
-          url: normalizedUrl,
-          result,
-        });
-      },
     });
 
     return sseResponse(stream);
   } catch (error) {
-    console.error("SEO audit generation failed", error);
-    const message = getAiErrorMessage(error);
+    console.error("Technical SEO audit failed", error);
     return NextResponse.json(
-      { error: `Failed to generate SEO audit: ${message}` },
+      { error: `Failed to run technical SEO audit: ${getAiErrorMessage(error)}` },
       { status: 500 },
     );
   }
