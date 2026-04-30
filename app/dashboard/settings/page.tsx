@@ -7,89 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import SideBar from "@/components/SideBar";
-import { useUser, useOrganization } from "@clerk/nextjs";
+import { useUser, useOrganization, OrganizationProfile } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Key, Shield, Plug } from "lucide-react";
+import { Key, Shield } from "lucide-react";
 
-type KeyStatus = { hasKey: boolean; preview: string | null };
-type MediaKeys = Record<string, KeyStatus>;
-
-const MEDIA_KEY_FIELDS: Array<{ field: string; label: string; placeholder: string; description: string }> = [
-  { field: "openaiApiKey", label: "OpenAI", placeholder: "sk-...", description: "DALL-E 3 & DALL-E 2 image generation" },
-  { field: "stabilityApiKey", label: "Stability AI", placeholder: "sk-...", description: "Stable Diffusion image models" },
-  { field: "replicateApiKey", label: "Replicate", placeholder: "r8_...", description: "FLUX, Kling, LTX, Wan, Hailuo, Veo 3" },
-  { field: "runwayApiKey", label: "Runway ML", placeholder: "rw-...", description: "Runway Gen-4 Turbo video generation" },
-  { field: "apifyApiKey", label: "Apify", placeholder: "apify_api_...", description: "Image search (Bing + Google)" },
-];
-
-function ApiKeyRow({
-  label, description, fieldName, placeholder, hasKey, preview, onSaved,
-}: {
-  label: string; description: string; fieldName: string; placeholder: string;
-  hasKey: boolean; preview: string | null; onSaved: () => void;
-}) {
-  const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function handleSave() {
-    if (!value.trim()) return;
-    setSaving(true);
-    const res = await fetch("/api/user-api-keys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [fieldName]: value }),
-    });
-    if (res.ok) {
-      toast.success(`${label} key saved`);
-      setValue("");
-      onSaved();
-    } else {
-      toast.error(`Failed to save ${label} key`);
-    }
-    setSaving(false);
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        {hasKey ? (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="font-mono text-xs">{preview}</Badge>
-            <Badge className="bg-green-500 text-xs">Connected</Badge>
-          </div>
-        ) : (
-          <Badge variant="destructive" className="text-xs">Not set</Badge>
-        )}
-      </div>
-      <div className="flex gap-2">
-        <Input type="password" placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} className="text-sm" />
-        <Button size="sm" onClick={handleSave} disabled={saving || !value.trim()}>
-          {saving ? "Saving…" : hasKey ? "Update" : "Save"}
-        </Button>
-      </div>
-    </div>
-  );
-}
+import { BrandOnboardingSettings } from "@/components/dashboard/BrandOnboardingSettings";
+import { StrategySettings } from "@/components/dashboard/StrategySettings";
 
 export default function SettingsPage() {
   const { user, isLoaded } = useUser();
   const [instagramHandle, setInstagramHandle] = useState("");
   const [accessToken, setAccessToken] = useState("");
-  const [mediaKeys, setMediaKeys] = useState<MediaKeys>({});
-
-  const loadMediaKeys = useCallback(() => {
-    fetch("/api/user-api-keys").then((r) => r.json()).then(setMediaKeys).catch(() => {});
-  }, []);
-
-  useEffect(() => { loadMediaKeys(); }, [loadMediaKeys]);
 
   const { organization } = useOrganization();
   const convexOrg = useQuery(
@@ -139,7 +71,7 @@ export default function SettingsPage() {
 
   return (
     <SideBar>
-      <div className="flex-1 space-y-4 p-8 pt-6 max-w-4xl mx-auto">
+      <div className="flex-1 space-y-4 p-6 md:p-8 pt-6 max-w-5xl mx-auto">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
           <p className="text-muted-foreground">
@@ -147,133 +79,100 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="instagram" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="instagram">Instagram</TabsTrigger>
-            <TabsTrigger value="media-studio">Media Studio</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
-            <TabsTrigger value="webhook">Webhooks</TabsTrigger>
+        <Tabs defaultValue="instagram" className="space-y-6">
+          <TabsList className="bg-white/5 border border-white/5 p-1 h-12">
+            <TabsTrigger value="instagram" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Instagram</TabsTrigger>
+            <TabsTrigger value="strategy" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Brand & Strategy</TabsTrigger>
+            <TabsTrigger value="team" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Team</TabsTrigger>
           </TabsList>
 
           <TabsContent value="instagram">
-            <Card>
-              <CardHeader>
+            <Card className="glass-card border-white/5 overflow-hidden">
+              <CardHeader className="border-b border-white/5 bg-white/5">
                 <CardTitle>Instagram Connection</CardTitle>
                 <CardDescription>
                   Connect your Instagram account for official metrics via Meta Graph API
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="handle">Instagram Handle</Label>
+              <CardContent className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="handle" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Instagram Handle</Label>
                   <Input
                     id="handle"
                     value={instagramHandle}
                     onChange={(e) => setInstagramHandle(e.target.value)}
                     placeholder="@yourhandle"
+                    className="bg-white/5 border-white/10 h-11"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="token">Access Token (Optional)</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="token" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Access Token (Optional)</Label>
                   <Input
                     id="token"
                     type="password"
                     value={accessToken}
                     onChange={(e) => setAccessToken(e.target.value)}
                     placeholder="Meta Graph API access token"
+                    className="bg-white/5 border-white/10 h-11"
                   />
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Get this from Meta Developer Console
                   </p>
                 </div>
-                <Button onClick={handleSaveIg}>Save Credentials</Button>
+                <div className="pt-4">
+                  <Button onClick={handleSaveIg} className="w-full md:w-auto px-8 h-11 amber-glow font-bold uppercase tracking-widest text-xs">Save Credentials</Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="media-studio">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plug className="h-4 w-4" /> Media Studio API Keys
-                </CardTitle>
-                <CardDescription>
-                  Add keys for the providers you want to use in Media Studio. Each key unlocks different image and video models.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Shield className="h-4 w-4" /> Keys are stored securely and never exposed to the browser
-                </div>
-                {MEDIA_KEY_FIELDS.map((k, i) => (
-                  <div key={k.field}>
-                    {i > 0 && <Separator className="mb-6" />}
-                    <ApiKeyRow
-                      label={k.label}
-                      description={k.description}
-                      fieldName={k.field}
-                      placeholder={k.placeholder}
-                      hasKey={mediaKeys[k.field]?.hasKey ?? false}
-                      preview={mediaKeys[k.field]?.preview ?? null}
-                      onSaved={loadMediaKeys}
-                    />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+          <TabsContent value="strategy" className="space-y-6">
+            {user?.id && <BrandOnboardingSettings clerkUserId={user.id} />}
+            {user?.id && <StrategySettings userId={user.id} />}
           </TabsContent>
 
           <TabsContent value="team">
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Management</CardTitle>
-                <CardDescription>
-                  Manage team members and their roles
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Team management is handled through Clerk Organizations.
-                  Use the Clerk dashboard to invite members and assign roles.
-                </p>
-                <Button className="mt-4" variant="outline">
-                  Open Clerk Dashboard
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="webhook">
-            <Card>
-              <CardHeader>
-                <CardTitle>Webhook Configuration</CardTitle>
-                <CardDescription>
-                  Configure webhook secrets for Apify integration
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div>
-                  <Label>Webhook Secret</Label>
-                  <Input
-                    value={process.env.NEXT_PUBLIC_WEBHOOK_SECRET || "Set in environment variables"}
-                    disabled
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Configure WEBHOOK_APIFY_SECRET in your environment
-                  </p>
-                </div>
-                <div className="mt-4">
-                  <Label>Webhook URL</Label>
-                  <Input
-                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/webhook/apify`}
-                    disabled
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Use this URL in your Apify actor configuration
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="glass-card rounded-[2rem] overflow-hidden border-white/5 bg-zinc-950/50 p-0">
+              <OrganizationProfile 
+                appearance={{
+                  variables: {
+                    colorPrimary: "#c79b09",
+                    colorText: "white",
+                    colorBackground: "transparent",
+                    colorTextSecondary: "#a1a1aa",
+                    colorInputBackground: "rgba(255, 255, 255, 0.05)",
+                    colorInputText: "white",
+                  },
+                  elements: {
+                    rootBox: "w-full",
+                    card: "bg-transparent shadow-none w-full border-none",
+                    navbar: "hidden",
+                    scrollBox: "bg-transparent",
+                    pageScrollBox: "bg-transparent",
+                    organizationProfile: {
+                      mobile: {
+                        navbar: "hidden"
+                      }
+                    },
+                    headerTitle: "text-white font-black",
+                    headerSubtitle: "text-muted-foreground",
+                    organizationSwitcherTrigger: "text-white",
+                    userPreviewMainIdentifier: "text-white",
+                    userPreviewSecondaryIdentifier: "text-muted-foreground",
+                    profileSectionTitleText: "text-primary uppercase tracking-widest font-black text-xs",
+                    formButtonPrimary: "amber-glow bg-primary text-primary-foreground hover:bg-primary/90 font-bold uppercase tracking-widest text-xs h-10",
+                    formButtonReset: "text-muted-foreground hover:text-white",
+                    formFieldLabel: "text-muted-foreground font-bold text-xs uppercase tracking-widest",
+                    formFieldInput: "bg-white/5 border-white/10 text-white focus:ring-primary focus:border-primary",
+                    tabButton: "text-muted-foreground hover:text-white data-[active]:text-primary",
+                    dividerLine: "bg-white/5",
+                    breadcrumbsItem: "text-muted-foreground",
+                    breadcrumbsSeparator: "text-muted-foreground",
+                    badge: "bg-primary/10 text-primary border-primary/20",
+                  }
+                }}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

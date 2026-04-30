@@ -2,45 +2,30 @@
 
 import SideBar from "@/components/SideBar";
 import { PlanGate } from "@/components/PlanGate";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SERVICES } from "@/lib/services";
-import { ServiceIcon } from "@/components/dashboard/service-icon";
+import { ColdEmailGenerator } from "@/components/dashboard/ColdEmailGenerator";
+import { MessageSquare } from "lucide-react";
 
 export default function EmailHubPage() {
-  const service = SERVICES.find((item) => item.id === "email-sms-flows");
-
   return (
     <SideBar>
-      <div className="mx-auto w-full max-w-7xl p-6 md:p-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Email & SMS Hub</h1>
-          <p className="text-muted-foreground">Automation workflows, templates, and integrations.</p>
+      <div className="mx-auto w-full max-w-7xl p-6 md:p-8 space-y-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-widest">
+              <MessageSquare className="w-4 h-4" />
+              <span>Communication Hub</span>
+            </div>
+            <h1 className="text-4xl font-black tracking-tight text-white/90">
+              Email & SMS Hub
+            </h1>
+            <p className="text-muted-foreground font-medium">
+              Automation workflows, outreach engineering, and template systems.
+            </p>
+          </div>
         </div>
 
         <PlanGate requiredPlan="starter">
-          {!service ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Empty state</CardTitle>
-                <CardDescription>No email services configured yet.</CardDescription>
-              </CardHeader>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ServiceIcon name={service.icon} />
-                  {service.name}
-                </CardTitle>
-                <CardDescription>{service.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Build and deploy lifecycle messaging with platform-level integrations.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          <ColdEmailGenerator />
         </PlanGate>
       </div>
     </SideBar>

@@ -29,6 +29,22 @@ type CompetitorResult = {
   overallCompetitiveThreatScore?: number;
 };
 
+function normalizeCompetitorResult(raw: any): CompetitorResult {
+  if (!raw || typeof raw !== "object") return {};
+  return {
+    strengthsOfCompetitor: raw.strengthsOfCompetitor ?? raw.strengths ?? [],
+    weaknessesOfCompetitor: raw.weaknessesOfCompetitor ?? raw.weaknesses ?? [],
+    opportunitiesWeCanExploit:
+      raw.opportunitiesWeCanExploit ?? raw.opportunities ?? [],
+    keywordGaps: raw.keywordGaps ?? raw.keyword_gaps ?? [],
+    contentGaps: raw.contentGaps ?? raw.content_gaps ?? [],
+    backlinkStrategyRecommendations:
+      raw.backlinkStrategyRecommendations ?? raw.backlink_recommendations ?? [],
+    overallCompetitiveThreatScore:
+      raw.overallCompetitiveThreatScore ?? raw.threat_score ?? raw.score ?? 0,
+  };
+}
+
 type JsonObject = Record<string, unknown>;
 
 async function readSseText(res: Response, onToken: (token: string) => void): Promise<string> {
@@ -146,16 +162,30 @@ function isAuditSection(value: unknown): value is AuditSection {
   return (
     typeof value === "object" &&
     value !== null &&
-    "score" in (value as Record<string, unknown>) &&
-    typeof (value as Record<string, unknown>).score === "number"
+    ("score" in (value as Record<string, unknown>) ||
+      "issues" in (value as Record<string, unknown>) ||
+      "recommendations" in (value as Record<string, unknown>) ||
+      "present" in (value as Record<string, unknown>))
   );
 }
 
 function computeOverallScore(result: JsonObject): number {
+  const topLevel =
+    result.overall_score ??
+    result.seo_score ??
+    result.overall_seo_score ??
+    result.score;
+  if (typeof topLevel === "number") return topLevel;
+
   const scores: number[] = [];
   for (const value of Object.values(result)) {
-    if (isAuditSection(value) && typeof value.score === "number") {
-      scores.push(value.score);
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "score" in (value as Record<string, unknown>) &&
+      typeof (value as Record<string, unknown>).score === "number"
+    ) {
+      scores.push((value as { score: number }).score);
     }
   }
   if (scores.length === 0) return 0;
@@ -373,8 +403,12 @@ function AuditResultsDashboard({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const sectionEntries = Object.entries(result).filter(([, value]) =>
-    isAuditSection(value),
+  const sectionEntries = Object.entries(result).filter(
+    ([key, value]) =>
+      isAuditSection(value) &&
+      !["overall_score", "seo_score", "overall_seo_score", "score"].includes(
+        key,
+      ),
   ) as [string, AuditSection][];
 
   const overall = computeOverallScore(result);
@@ -549,6 +583,17 @@ export default function SeoHubPage() {
   const [competitorLoading, setCompetitorLoading] = useState(false);
   const [competitorError, setCompetitorError] = useState<string | null>(null);
   const [competitor, setCompetitor] = useState<CompetitorResult | null>(null);
+  const [technicalUrl, setTechnicalUrl] = useState("");
+  const [technicalLoading, setTechnicalLoading] = useState(false);
+  const [technicalError, setTechnicalError] = useState<string | null>(null);
+  const [technicalRaw, setTechnicalRaw] = useState("");
+  const [technicalResult, setTechnicalResult] = useState<JsonObject | null>(null);
+
+  const [backlinkUrl, setBacklinkUrl] = useState("");
+  const [backlinkLoading, setBacklinkLoading] = useState(false);
+  const [backlinkError, setBacklinkError] = useState<string | null>(null);
+  const [backlinkRaw, setBacklinkRaw] = useState("");
+  const [backlinkResult, setBacklinkResult] = useState<JsonObject | null>(null);
 
   const runAudit = async () => {
     setAuditLoading(true);
@@ -620,12 +665,60 @@ export default function SeoHubPage() {
       if (!res.ok) {
         throw new Error("Failed to run competitor analysis");
       }
-      const data = (await res.json()) as { analysis: CompetitorResult };
-      setCompetitor(data.analysis);
+      const data = (await res.json()) as { analysis: any };
+      setCompetitor(normalizeCompetitorResult(data.analysis));
     } catch (error) {
       setCompetitorError(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setCompetitorLoading(false);
+    }
+  };
+
+  const runTechnical = async () => {
+    setTechnicalLoading(true);
+    setTechnicalError(null);
+    setTechnicalRaw("");
+    setTechnicalResult(null);
+    try {
+      const normalizedUrl = normalizeAuditUrl(technicalUrl);
+      const res = await fetch("/api/ai/technical-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: normalizedUrl }),
+      });
+      if (!res.ok) throw new Error("Failed to run technical SEO audit");
+      const finalText = await readSseText(res, (token) =>
+        setTechnicalRaw((prev) => prev + token),
+      );
+      setTechnicalResult(tryParseJson(finalText));
+    } catch (err) {
+      setTechnicalError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setTechnicalLoading(false);
+    }
+  };
+
+  const runBacklinks = async () => {
+    setBacklinkLoading(true);
+    setBacklinkError(null);
+    setBacklinkRaw("");
+    setBacklinkResult(null);
+    try {
+      const normalizedUrl = normalizeAuditUrl(backlinkUrl);
+      const res = await fetch("/api/ai/backlink-strategy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: normalizedUrl }),
+      });
+      if (!res.ok) throw new Error("Failed to generate backlink strategy");
+      const finalText = await readSseText(res, (token) =>
+        setBacklinkRaw((prev) => prev + token),
+      );
+      setBacklinkResult(tryParseJson(finalText));
+    } catch (err) {
+      setBacklinkError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBacklinkLoading(false);
     }
   };
 
@@ -780,10 +873,38 @@ export default function SeoHubPage() {
                     Crawl controls, indexing, performance, and architecture checks.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Empty state: connect your site data sources to run technical diagnostics.
-                  </p>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="technicalUrl">Website URL</Label>
+                    <Input
+                      id="technicalUrl"
+                      value={technicalUrl}
+                      onChange={(e) => setTechnicalUrl(e.target.value)}
+                      placeholder="example.com"
+                    />
+                  </div>
+                  <Button
+                    onClick={runTechnical}
+                    disabled={!technicalUrl || technicalLoading}
+                  >
+                    {technicalLoading ? "Analyzing…" : "Run Technical Audit"}
+                  </Button>
+                  {technicalLoading && !technicalRaw ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : null}
+                  {technicalError ? (
+                    <p className="text-sm text-red-500">{technicalError}</p>
+                  ) : null}
+                  {technicalResult ? (
+                    <AuditResultsDashboard
+                      result={technicalResult}
+                      auditUrl={technicalUrl}
+                    />
+                  ) : technicalRaw ? (
+                    <pre className="text-xs whitespace-pre-wrap rounded-md border p-4 overflow-x-auto bg-black/20">
+                      {technicalRaw}
+                    </pre>
+                  ) : null}
                 </CardContent>
               </Card>
             </PlanGate>
@@ -798,10 +919,84 @@ export default function SeoHubPage() {
                     On-page and off-page authority building workflows.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Empty state: backlink campaign modules will show here.
-                  </p>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="backlinkUrl">Website URL</Label>
+                    <Input
+                      id="backlinkUrl"
+                      value={backlinkUrl}
+                      onChange={(e) => setBacklinkUrl(e.target.value)}
+                      placeholder="example.com"
+                    />
+                  </div>
+                  <Button
+                    onClick={runBacklinks}
+                    disabled={!backlinkUrl || backlinkLoading}
+                  >
+                    {backlinkLoading ? "Generating…" : "Generate Strategy"}
+                  </Button>
+                  {backlinkLoading && !backlinkRaw ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : null}
+                  {backlinkError ? (
+                    <p className="text-sm text-red-500">{backlinkError}</p>
+                  ) : null}
+                  {backlinkResult ? (
+                    <div className="space-y-4">
+                      <Card className="bg-amber-500/5 border-amber-500/20">
+                        <CardHeader>
+                          <CardTitle className="text-base text-amber-200">
+                            Strategy Summary
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm text-muted-foreground">
+                          {String(backlinkResult.summary || "")}
+                        </CardContent>
+                      </Card>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {Object.entries(backlinkResult)
+                          .filter(([k]) => k !== "summary")
+                          .map(([key, data]: [string, any]) => (
+                            <Card key={key} className="bg-white/5 border-white/10">
+                              <CardHeader>
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-sm font-bold uppercase tracking-wider">
+                                    {snakeToTitleCase(key)}
+                                  </CardTitle>
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/70">
+                                    {data.potential_impact || "Medium"} Impact
+                                  </span>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                <p className="text-xs text-muted-foreground">
+                                  {data.strategy_description}
+                                </p>
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-bold uppercase text-amber-500/80">
+                                    Action Steps
+                                  </p>
+                                  <ul className="text-xs space-y-1">
+                                    {(data.action_steps || []).map(
+                                      (step: string, i: number) => (
+                                        <li key={i} className="flex gap-2">
+                                          <span>•</span>
+                                          <span>{step}</span>
+                                        </li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  ) : backlinkRaw ? (
+                    <pre className="text-xs whitespace-pre-wrap rounded-md border p-4 overflow-x-auto bg-black/20">
+                      {backlinkRaw}
+                    </pre>
+                  ) : null}
                 </CardContent>
               </Card>
             </PlanGate>

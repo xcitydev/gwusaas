@@ -137,11 +137,26 @@ export default function ReferralProgramPage() {
                 </Button>
               </div>
               <div className="flex space-x-2">
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const subject = encodeURIComponent("Check out this growth platform");
+                    const body = encodeURIComponent(`Hey! I've been using this platform to grow my business and thought you might like it: ${referralLink}`);
+                    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                  }}
+                >
                   <Mail className="h-4 w-4 mr-2" />
                   Email
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const text = encodeURIComponent(`Growing my business with this platform. Check it out: ${referralLink}`);
+                    window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
+                  }}
+                >
                   <Share2 className="h-4 w-4 mr-2" />
                   Social Media
                 </Button>

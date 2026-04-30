@@ -9,7 +9,12 @@ export const generateLeadProfile = action({
     niche: v.string(),
   },
   handler: async (_ctx, { niche }) => {
-    const client = new Anthropic({apiKey: process.env.ANTHROPIC_API_KEY!});
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error(
+        "ANTHROPIC_API_KEY is not set on the Convex deployment. Run `npx convex env set ANTHROPIC_API_KEY <your-key>`.",
+      );
+    }
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",

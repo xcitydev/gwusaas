@@ -3,24 +3,20 @@ import { z } from "zod";
 import { getAiErrorMessage, sseResponse, streamClaudeJson } from "@/lib/ai";
 import { scrapeUrl } from "@/lib/firecrawl";
 import { requirePlan } from "@/lib/route-auth";
-import { saveSeoAuditHistory } from "@/lib/convex-history";
 
 const bodySchema = z.object({
   url: z.string().min(1),
 });
 
 const systemPrompt =
-  "You are an expert SEO auditor. Analyze the following webpage content and return a structured JSON SEO audit. " +
-  "For each section (title_tag, meta_description, headings, keyword_density, internal_linking, page_speed, mobile_friendliness, schema_markup), " +
-  "provide an object with these fields: 'score' (number 0-10), 'present' (boolean), 'content' (string, optional), 'issues' (array of strings), and 'recommendations' (array of strings). " +
-  "Also include a top-level 'overall_score' field (number 0-100). Be specific, technical, and actionable.";
+  "You are a SEO Link Building Strategist. Based on the website content provided, generate a detailed backlink strategy in JSON format. " +
+  "Categories should include: 'Competitor Analysis', 'Guest Posting', 'Directory Opportunities', 'Broken Link Building', and 'PR/Outreach'. " +
+  "For each category, provide: 'difficulty' (Low/Medium/High), 'potential_impact' (High/Medium/Low), 'strategy_description' (string), and 'action_steps' (array of strings). " +
+  "Also include a 'summary' string of the overall strategy.";
 
 function normalizeUrl(input: string) {
   const raw = input.trim();
-  if (!raw) {
-    throw new Error("URL is required");
-  }
-
+  if (!raw) throw new Error("URL is required");
   try {
     return new URL(raw).toString();
   } catch {
@@ -34,10 +30,8 @@ function normalizeUrl(input: string) {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePlan("starter");
-    if (!guard.ok) {
-      return guard.response;
-    }
+    const guard = await requirePlan("growth");
+    if (!guard.ok) return guard.response;
 
     const parsed = bodySchema.safeParse(await req.json());
     if (!parsed.success) {
@@ -58,28 +52,13 @@ export async function POST(req: Request) {
           content: `URL: ${normalizedUrl}\n\nScraped Content:\n${pageContent}`,
         },
       ],
-      onComplete: async (fullText) => {
-        let result: unknown = fullText;
-        try {
-          result = JSON.parse(fullText);
-        } catch {
-          // Fallback to raw text if model returns invalid JSON.
-        }
-
-        await saveSeoAuditHistory({
-          userId: guard.userId,
-          url: normalizedUrl,
-          result,
-        });
-      },
     });
 
     return sseResponse(stream);
   } catch (error) {
-    console.error("SEO audit generation failed", error);
-    const message = getAiErrorMessage(error);
+    console.error("Backlink strategy generation failed", error);
     return NextResponse.json(
-      { error: `Failed to generate SEO audit: ${message}` },
+      { error: `Failed to generate backlink strategy: ${getAiErrorMessage(error)}` },
       { status: 500 },
     );
   }
