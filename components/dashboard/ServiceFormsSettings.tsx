@@ -75,10 +75,30 @@ const labelCls = "text-xs font-black uppercase tracking-widest text-muted-foregr
 const inputCls = "h-12 bg-white/5 border-white/5 rounded-xl px-4 font-medium focus:ring-primary/20";
 const textareaCls = "bg-white/5 border-white/5 rounded-2xl p-4 font-medium focus:ring-primary/20";
 
-export function ServiceFormsSettings() {
+type ServiceFormsSettingsProps = {
+  /** Optional whitelist of service types to show. Defaults to all 5. */
+  allowedServices?: ServiceType[];
+  /** Optional override for the picker card title. */
+  title?: string;
+  /** Optional override for the picker card description. */
+  description?: string;
+  /** Fires after a successful submission. */
+  onSubmitted?: () => void;
+};
+
+export function ServiceFormsSettings({
+  allowedServices,
+  title,
+  description,
+  onSubmitted,
+}: ServiceFormsSettingsProps = {}) {
   const { user } = useUser();
   const [selected, setSelected] = useState<ServiceType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const visibleServices = allowedServices
+    ? SERVICES.filter((s) => allowedServices.includes(s.id))
+    : SERVICES;
 
   const [outreachData, setOutreachData] = useState(emptyOutreach);
   const [massDmData, setMassDmData] = useState(emptyMassDm);
@@ -180,6 +200,7 @@ export function ServiceFormsSettings() {
       }
       toast.success("Submitted successfully!");
       resetSelected();
+      onSubmitted?.();
     } catch (err) {
       console.error(err);
       toast.error("Failed to submit. Please try again.");
@@ -192,14 +213,14 @@ export function ServiceFormsSettings() {
     return (
       <Card className="glass-card border-white/5 overflow-hidden">
         <CardHeader className="border-b border-white/5 bg-white/5">
-          <CardTitle>Request a Service</CardTitle>
+          <CardTitle>{title ?? "Request a Service"}</CardTitle>
           <CardDescription>
-            Tell us what you need — we&apos;ll handle it.
+            {description ?? "Tell us what you need — we'll handle it."}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 md:p-8">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {SERVICES.map((service) => (
+            {visibleServices.map((service) => (
               <motion.div
                 key={service.id}
                 whileHover={{ y: -3 }}

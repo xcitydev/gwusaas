@@ -26,7 +26,6 @@ import {
   Settings,
   Sparkles,
   Users,
-  UserRoundCog,
   WalletCards,
   CreditCard,
 } from "lucide-react";
@@ -75,7 +74,6 @@ const agencyNav: NavSection[] = [
   {
     title: "Grow Faster with AI",
     items: [
-      { label: "AI Toolbox", href: "/dashboard/ai-services", icon: Bot, requiredPlan: "growth" },
       { label: "Create with AI", href: "/dashboard/ai-studio", icon: Bot, requiredPlan: "free", soon: true },
       { label: "Make Images & Videos", href: "/dashboard/media-studio", icon: Clapperboard, requiredPlan: "growth" },
       { label: "7-Day Content Plan", href: "/dashboard/content-pipeline", icon: CalendarDays, requiredPlan: "growth" },
@@ -84,7 +82,6 @@ const agencyNav: NavSection[] = [
       { label: "Find Customers", href: "/dashboard/lead-gen", icon: Search, requiredPlan: "growth" },
       { label: "Audio to Text", href: "/dashboard/transcriber", icon: Mic, requiredPlan: "starter" },
       { label: "AI Phone Agent", href: "/dashboard/voice-caller", icon: PhoneCall, requiredPlan: "growth" },
-      { label: "Write Sales Scripts", href: "/dashboard/outreach/script-generator", icon: UserRoundCog, requiredPlan: "starter" },
       { label: "Viral Ideas", href: "/dashboard/viral-ideas", icon: Lightbulb, requiredPlan: "free" },
     ],
   },
@@ -120,7 +117,6 @@ const directClientNav: NavSection[] = [
   {
     title: "Grow Faster with AI",
     items: [
-      { label: "AI Toolbox", href: "/dashboard/ai-services", icon: Bot, requiredPlan: "growth" },
       { label: "Create with AI", href: "/dashboard/ai-studio", icon: Bot, requiredPlan: "free", soon: true },
       { label: "Make Images & Videos", href: "/dashboard/media-studio", icon: Clapperboard, requiredPlan: "growth" },
       { label: "7-Day Content Plan", href: "/dashboard/content-pipeline", icon: CalendarDays, requiredPlan: "growth" },
@@ -129,7 +125,6 @@ const directClientNav: NavSection[] = [
       { label: "Find Customers", href: "/dashboard/lead-gen", icon: Search, requiredPlan: "growth" },
       { label: "Audio to Text", href: "/dashboard/transcriber", icon: Mic, requiredPlan: "starter" },
       { label: "AI Phone Agent", href: "/dashboard/voice-caller", icon: PhoneCall, requiredPlan: "growth" },
-      { label: "Write Sales Scripts", href: "/dashboard/outreach/script-generator", icon: UserRoundCog, requiredPlan: "starter" },
       { label: "Viral Ideas", href: "/dashboard/viral-ideas", icon: Lightbulb, requiredPlan: "free" },
     ],
   },
@@ -151,6 +146,8 @@ function isRouteActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+const SIDEBAR_SCROLL_KEY = "app-sidebar-scroll";
+
 export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
   const pathname = usePathname();
   const { user } = useUser();
@@ -158,6 +155,20 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
   const { isAgency, loading } = useClientContext();
   const userPlan = normalizePlan(user?.publicMetadata?.plan);
   const navItems = isAgency ? agencyNav : directClientNav;
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Restore scroll position on mount (sidebar remounts on every route change).
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+    if (saved && scrollRef.current) {
+      scrollRef.current.scrollTop = Number(saved) || 0;
+    }
+  }, []);
+
+  const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(e.currentTarget.scrollTop));
+  }, []);
 
   return (
     <nav
@@ -191,7 +202,11 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
 
       {!loading ? <ClientSwitcher /> : null}
 
-      <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 space-y-4 overflow-y-auto pr-1"
+      >
         {navItems.map((section) => (
           <div key={section.title} className="space-y-1.5">
             <p className="px-3 text-xs uppercase tracking-wide text-muted-foreground/80">

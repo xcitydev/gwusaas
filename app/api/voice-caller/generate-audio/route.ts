@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   voiceId: z.string().min(1),
   scriptText: z.string().min(1),
-  campaignId: z.string().min(1),
+  campaignId: z.string().min(1).optional(),
 });
 
 export async function POST(req: Request) {
@@ -61,17 +61,21 @@ export async function POST(req: Request) {
 
     const arrayBuffer = await ttsRes.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const filename = `campaign-${body.campaignId}-${Date.now()}.mp3`;
+    const filename = body.campaignId
+      ? `campaign-${body.campaignId}-${Date.now()}.mp3`
+      : `preview-${body.voiceId}-${Date.now()}.mp3`;
 
     const audioUrl = await uploadCampaignAudio(buffer, filename);
 
-    try {
-      await updateCampaignAudio(body.campaignId, audioUrl);
-    } catch (error) {
-      console.warn("[voice-caller/generate-audio] updateCampaignAudio failed", {
-        campaignId: body.campaignId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    if (body.campaignId) {
+      try {
+        await updateCampaignAudio(body.campaignId, audioUrl);
+      } catch (error) {
+        console.warn("[voice-caller/generate-audio] updateCampaignAudio failed", {
+          campaignId: body.campaignId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     return NextResponse.json({ audioUrl });

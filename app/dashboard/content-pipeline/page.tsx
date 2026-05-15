@@ -1,315 +1,393 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
-import { CalendarDays, Rocket, Trash2 } from "lucide-react";
-import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
-import SideBar from "@/components/SideBar";
-import { PlanGate } from "@/components/PlanGate";
-import { ContentPipelineConfigModal } from "@/components/content-pipeline/ContentPipelineConfigModal";
-import { PipelineRunStatus } from "@/components/content-pipeline/PipelineRunStatus";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Id } from "@/convex/_generated/dataModel";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+  Upload,
+  Image as ImageIcon,
+  Film,
+  Trash2,
+  CalendarDays,
+  Sparkles,
+  ArrowRight,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 
-type PipelineConfig = {
-  _id: string;
-  niche: string;
-  brandName: string;
-  brandVoice: string;
-  contentPillars: string[];
-  targetPlatforms: string[];
+import SideBar from "@/components/SideBar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+type Upload = {
+  _id: Id<"contentPlanUploads">;
+  filename: string;
+  mimeType: string;
+  size: number;
+  note?: string;
+  createdAt: number;
+  url: string | null;
 };
 
-type PipelineRun = {
-  _id: string;
-  status: string;
+type PlanRow = {
+  _id: Id<"contentPlans">;
   weekStartDate: string;
+  brandName?: string;
+  uploadIds: Id<"contentPlanUploads">[];
+  status: string;
   createdAt: number;
 };
 
-function statusClass(status: string) {
-  if (status === "complete") return "bg-emerald-500/20 text-emerald-300";
-  if (status === "error") return "bg-red-500/20 text-red-300";
-  return "bg-amber-500/20 text-amber-200";
-}
+const MAX_BYTES = 25 * 1024 * 1024; // 25 MB per file
 
-export default function ContentPipelinePage() {
-  const { user } = useUser();
+export default function ContentPlanPage() {
   const router = useRouter();
-  const [configOpen, setConfigOpen] = useState(false);
-  const [isStartingRun, setIsStartingRun] = useState(false);
-  const [activeRunId, setActiveRunId] = useState<string | null>(null);
-  const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(null);
-  const [isDeletingRun, setIsDeletingRun] = useState(false);
-  const deleteRun = useMutation(api.contentPipeline.deleteRun);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const config = useQuery(
-    api.contentPipeline.getConfig,
-    user?.id ? { userId: user.id } : "skip",
-  ) as PipelineConfig | null | undefined;
-  const runs = useQuery(
-    api.contentPipeline.getRuns,
-    user?.id ? { userId: user.id } : "skip",
-  ) as PipelineRun[] | undefined;
+  const [brandName, setBrandName] = useState("");
+  const [niche, setNiche] = useState("");
+  const [brandVoice, setBrandVoice] = useState("");
 
-  const latestCompleted = useMemo(
-    () => runs?.find((run) => run.status === "complete") || null,
-    [runs],
-  );
+  const uploads = useQuery(api.contentPlans.listMyUploads, {}) as Upload[] | undefined;
+  const plans = useQuery(api.contentPlans.listMyPlans, { limit: 25 }) as PlanRow[] | undefined;
 
-  const currentRunId = useMemo(() => {
-    if (activeRunId) return activeRunId;
-    const inFlight = runs?.find(
-      (run) => run.status !== "complete" && run.status !== "error",
-    );
-    return inFlight?._id ? String(inFlight._id) : null;
-  }, [activeRunId, runs]);
+  const generateUploadUrl = useMutation(api.contentPlans.generateUploadUrl);
+  const saveUpload = useMutation(api.contentPlans.saveUpload);
+  const deleteUpload = useMutation(api.contentPlans.deleteUpload);
 
-  const startRun = async () => {
-    setIsStartingRun(true);
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
     try {
-      const response = await fetch("/api/content-pipeline/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weekStartDate: new Date().toISOString().slice(0, 10),
-        }),
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | { runId?: string; error?: string }
-        | null;
-      if (!response.ok || !payload?.runId) {
-        throw new Error(payload?.error || "Failed to start content pipeline run");
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_BYTES) {
+          toast.error(`${file.name} is too large (max 25MB)`);
+          continue;
+        }
+        const url = await generateUploadUrl();
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+        await saveUpload({
+          storageId,
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+        });
       }
-      setActiveRunId(payload.runId);
-      toast.success("Content pipeline started");
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to start pipeline run", error);
-      toast.error(error instanceof Error ? error.message : "Failed to start run");
+      toast.success("Upload complete");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
-      setIsStartingRun(false);
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const confirmDeleteRun = async () => {
-    if (!user?.id || !pendingDeleteRunId) return;
-    setIsDeletingRun(true);
+  const handleDelete = async (id: Id<"contentPlanUploads">) => {
     try {
-      await deleteRun({
-        userId: user.id,
-        runId: pendingDeleteRunId as Id<"contentPipelineRuns">,
+      await deleteUpload({ uploadId: id });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
-      toast.success("Pipeline run deleted");
-      if (activeRunId === pendingDeleteRunId) {
-        setActiveRunId(null);
+      toast.success("Removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  };
+
+  const generatePlan = async () => {
+    if (selectedIds.size === 0) {
+      toast.error("Select at least one piece of content first.");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/content-plan/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploadIds: Array.from(selectedIds),
+          brandName: brandName.trim() || undefined,
+          niche: niche.trim() || undefined,
+          brandVoice: brandVoice.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json?.error || "Failed to build plan");
+        return;
       }
-      setPendingDeleteRunId(null);
-    } catch (error) {
-      console.error("Failed to delete pipeline run", error);
-      toast.error(error instanceof Error ? error.message : "Failed to delete run");
+      toast.success("Plan ready!");
+      router.push(`/dashboard/content-pipeline/${json.planId}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error");
     } finally {
-      setIsDeletingRun(false);
+      setGenerating(false);
     }
   };
 
   return (
     <SideBar>
-      <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold">Content Pipeline</h1>
-            <p className="text-muted-foreground">
-              Generate a full 7-day, multi-platform AI calendar from one workflow.
-            </p>
+      <div className="mx-auto w-full max-w-6xl p-6 md:p-8 space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-widest">
+            <CalendarDays className="w-4 h-4" />
+            <span>7-Day Content Plan</span>
           </div>
-          <Button variant="outline" onClick={() => setConfigOpen(true)}>
-            Edit Config
-          </Button>
+          <h1 className="text-4xl font-black tracking-tight text-white/90">
+            Upload your content. We&apos;ll plan your week.
+          </h1>
+          <p className="text-muted-foreground font-medium max-w-2xl">
+            Drop in photos and videos you already have. We&apos;ll map each one to a
+            day, platform, hook, and caption — no AI-generated images, just smart
+            scheduling around your real content.
+          </p>
         </div>
 
-        <PlanGate requiredPlan="growth">
-          {config === undefined || runs === undefined ? (
-            <div className="space-y-3">
-              <Skeleton className="h-40 w-full" />
-              <Skeleton className="h-20 w-full" />
+        {/* Step 1: Brand context */}
+        <Card className="glass-card border-white/5 overflow-hidden">
+          <CardHeader className="border-b border-white/5 bg-white/5">
+            <CardTitle>Step 1 · Tell us about your brand</CardTitle>
+            <CardDescription>Used to tune the caption tone. All optional.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 md:p-8 grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Brand</Label>
+              <Input
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                placeholder="Grow With Us Agency"
+                className="h-11 bg-white/5 border-white/5 rounded-xl"
+              />
             </div>
-          ) : !config ? (
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5" />
-                  Set up your content pipeline
-                </CardTitle>
-                <CardDescription>
-                  Add your niche, voice, pillars, and platforms once to unlock weekly
-                  automated calendar generation.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={() => setConfigOpen(true)}>Set Up Pipeline</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configuration Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <p>
-                    <strong>Brand:</strong> {config.brandName}
-                  </p>
-                  <p>
-                    <strong>Niche:</strong> {config.niche}
-                  </p>
-                  <p>
-                    <strong>Voice:</strong> {config.brandVoice}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {config.targetPlatforms.map((platform) => (
-                      <Badge key={platform} variant="secondary">
-                        {platform}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button onClick={() => void startRun()} disabled={isStartingRun}>
-                    <Rocket className="mr-2 h-4 w-4" />
-                    {isStartingRun ? "Starting..." : "Generate this week's content"}
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Niche</Label>
+              <Input
+                value={niche}
+                onChange={(e) => setNiche(e.target.value)}
+                placeholder="Real estate lead gen"
+                className="h-11 bg-white/5 border-white/5 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Voice</Label>
+              <Input
+                value={brandVoice}
+                onChange={(e) => setBrandVoice(e.target.value)}
+                placeholder="Friendly, direct, no fluff"
+                className="h-11 bg-white/5 border-white/5 rounded-xl"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-              {currentRunId ? (
-                <PipelineRunStatus
-                  runId={currentRunId}
-                  onRetry={() => {
-                    void startRun();
-                  }}
-                />
-              ) : null}
+        {/* Step 2: Upload */}
+        <Card className="glass-card border-white/5 overflow-hidden">
+          <CardHeader className="border-b border-white/5 bg-white/5">
+            <CardTitle>Step 2 · Upload your content</CardTitle>
+            <CardDescription>Photos and videos. Up to 25MB each.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 md:p-8 space-y-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "w-full rounded-2xl border-2 border-dashed border-white/10 bg-white/5 hover:border-primary/40 hover:bg-primary/5 transition py-12 flex flex-col items-center gap-3 cursor-pointer",
+                uploading && "opacity-60 pointer-events-none"
+              )}
+            >
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <Upload className="w-6 h-6 text-primary" />
+              </div>
+              <p className="font-bold text-white/90">
+                {uploading ? "Uploading..." : "Click to upload photos or videos"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                JPG, PNG, MP4, MOV — max 25MB each
+              </p>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={(e) => void handleFiles(e.target.files)}
+            />
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Past Runs</CardTitle>
-                  <CardDescription>
-                    Open any run to review, approve, regenerate, or export content.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {runs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No runs yet. Generate your first weekly calendar above.
-                    </p>
-                  ) : (
-                    runs.map((run) => (
-                      <div
-                        key={run._id}
-                        className="rounded-lg border border-border/80 p-4 transition-colors hover:bg-accent/40"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <Link
-                            href={`/dashboard/content-pipeline/${run._id}`}
-                            className="flex-1 min-w-0"
-                          >
-                            <p className="font-medium">Week of {run.weekStartDate}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {new Date(run.createdAt).toLocaleString()}
-                            </p>
-                          </Link>
-                          <div className="flex items-center gap-2">
-                            <Badge className={statusClass(run.status)}>{run.status}</Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-400 hover:text-red-300"
-                              onClick={() => setPendingDeleteRunId(String(run._id))}
-                              aria-label="Delete run"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
+            {uploads !== undefined && uploads.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-4">
+                {uploads.map((u) => {
+                  const isImage = u.mimeType.startsWith("image/");
+                  const selected = selectedIds.has(u._id);
+                  return (
+                    <div
+                      key={u._id}
+                      className={cn(
+                        "relative rounded-xl overflow-hidden border transition cursor-pointer group",
+                        selected
+                          ? "border-primary ring-2 ring-primary/40"
+                          : "border-white/10 hover:border-primary/30"
+                      )}
+                      onClick={() => toggleSelected(u._id)}
+                    >
+                      <div className="aspect-square bg-white/5 flex items-center justify-center">
+                        {isImage && u.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={u.url}
+                            alt={u.filename}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Film className="w-10 h-10 text-muted-foreground" />
+                        )}
                       </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
+                      <div className="p-2 text-[10px] truncate text-white/80 bg-black/40 absolute bottom-0 inset-x-0">
+                        {u.filename}
+                      </div>
+                      {selected && (
+                        <div className="absolute top-2 left-2 bg-primary text-primary-foreground rounded-full p-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDelete(u._id);
+                        }}
+                        className="absolute top-2 right-2 bg-black/60 hover:bg-red-500/80 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-              {latestCompleted ? (
-                <Button asChild variant="outline">
-                  <Link href={`/dashboard/content-pipeline/${latestCompleted._id}`}>
-                    Open latest completed calendar
-                  </Link>
-                </Button>
-              ) : null}
+            {uploads !== undefined && uploads.length === 0 && (
+              <p className="text-center text-xs text-muted-foreground py-4">
+                Nothing uploaded yet. Drop your first piece of content above.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Step 3: Generate */}
+        <Card className="glass-card border-primary/20 overflow-hidden bg-primary/3">
+          <CardContent className="p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <p className="font-black text-lg text-white/90">
+                  Step 3 · Build my plan
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {selectedIds.size === 0
+                  ? "Select the content you want included above."
+                  : `${selectedIds.size} item${selectedIds.size === 1 ? "" : "s"} selected. We'll map each to a day, platform, and caption.`}
+              </p>
             </div>
-          )}
-        </PlanGate>
+            <Button
+              onClick={() => void generatePlan()}
+              disabled={generating || selectedIds.size === 0}
+              className="h-12 px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest amber-glow"
+            >
+              {generating ? (
+                "Building plan..."
+              ) : (
+                <span className="flex items-center gap-2">
+                  Build my 7-day plan
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
-        <ContentPipelineConfigModal
-          open={configOpen}
-          onOpenChange={setConfigOpen}
-          initialConfig={
-            config
-              ? {
-                  niche: config.niche,
-                  brandName: config.brandName,
-                  brandVoice: config.brandVoice,
-                  contentPillars: config.contentPillars,
-                  targetPlatforms: config.targetPlatforms,
-                }
-              : null
-          }
-          onSaved={() => router.refresh()}
-        />
-        <Dialog
-          open={Boolean(pendingDeleteRunId)}
-          onOpenChange={(open) => {
-            if (!open) setPendingDeleteRunId(null);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete pipeline run?</DialogTitle>
-              <DialogDescription>
-                This will permanently remove the run and all associated viral topics,
-                refined topics, and generated content.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setPendingDeleteRunId(null)}
-                disabled={isDeletingRun}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => void confirmDeleteRun()}
-                disabled={isDeletingRun}
-              >
-                {isDeletingRun ? "Deleting..." : "Delete run"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Past plans */}
+        <Card className="glass-card border-white/5 overflow-hidden">
+          <CardHeader className="border-b border-white/5 bg-white/5">
+            <CardTitle>Past plans</CardTitle>
+            <CardDescription>Open any plan to view, copy, or schedule.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 md:p-8">
+            {plans === undefined && (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            )}
+            {plans !== undefined && plans.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No plans yet. Build your first above.
+              </p>
+            )}
+            {plans !== undefined && plans.length > 0 && (
+              <ul className="divide-y divide-white/5">
+                {plans.map((p) => (
+                  <li key={p._id} className="py-3">
+                    <Link
+                      href={`/dashboard/content-pipeline/${p._id}`}
+                      className="flex items-center justify-between gap-4 group"
+                    >
+                      <div>
+                        <p className="font-bold text-white/90 group-hover:text-primary transition">
+                          {p.brandName || "Untitled brand"} — week of {p.weekStartDate}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.uploadIds.length} pieces · {new Date(p.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge
+                          className={cn(
+                            "text-[9px] font-black uppercase tracking-widest border",
+                            p.status === "ready"
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          )}
+                        >
+                          {p.status}
+                        </Badge>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition" />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </SideBar>
   );

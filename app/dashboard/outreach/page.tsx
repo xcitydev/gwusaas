@@ -1,373 +1,311 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
-import SideBar from "@/components/SideBar";
-import { useSelectedClient } from "@/context/ClientContext";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { MessageSquare, Users, Plus, Sparkles, Send, BarChart3, Target, Calendar, ArrowRight } from "lucide-react";
-import { toast } from "sonner";
-import { useOrganization } from "@clerk/nextjs";
-import { UpgradeModal } from "@/components/UpgradeModal";
-import { PLAN_LIMITS, normalizePlan } from "@/lib/plans";
+  Send,
+  Plus,
+  Target,
+  Sparkles,
+  MessageSquare,
+  ArrowLeft,
+  Instagram,
+  Megaphone,
+  Inbox,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+import SideBar from "@/components/SideBar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ServiceFormsSettings } from "@/components/dashboard/ServiceFormsSettings";
 import { cn } from "@/lib/utils";
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
+const campaignTypeMeta: Record<
+  string,
+  { label: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  "real-estate": { label: "Real Estate Outreach", icon: Target },
+  general: { label: "Instagram Outreach", icon: Instagram },
+  "mass-dm": { label: "Mass DM Blast", icon: Megaphone },
+};
+
+const formatDate = (ts?: number) => {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const statusTone = (status?: string) => {
+  switch (status) {
+    case "setup":
+      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+    case "active":
+    case "running":
+      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+    case "paused":
+      return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+    case "completed":
+      return "bg-primary/10 text-primary border-primary/20";
+    default:
+      return "bg-white/5 text-muted-foreground border-white/10";
   }
 };
 
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 }
+type Campaign = {
+  _id: string;
+  campaignType?: string;
+  instagramUsername?: string;
+  status?: string;
+  createdAt?: number;
+  targetAccounts?: string[];
+  dmCount?: string;
 };
 
-export default function OutreachPage() {
-  const { user } = useUser();
-  const { organization, isLoaded: isOrgLoaded } = useOrganization();
-  const { selectedClient } = useSelectedClient();
-  const selectedClientId = selectedClient?._id;
+export default function GetNewCustomersPage() {
+  const [launcherOpen, setLauncherOpen] = useState(false);
 
-  const convexOrg = useQuery(
-    api.organization.getByClerkId,
-    organization?.id ? { clerkOrgId: organization.id } : "skip"
-  );
-
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [messageType, setMessageType] = useState<
-    "account_outreach" | "mass_dm" | "follow_up"
-  >("account_outreach");
-  const [script, setScript] = useState("");
-  const [targets, setTargets] = useState("");
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-
-  // Plan & Usage Logic
-  const userPlan = normalizePlan(user?.publicMetadata?.plan);
-  const limits = PLAN_LIMITS[userPlan];
-  const usageCount = useQuery(api.usage.getUsage, { metric: "dailyDms" }) ?? 0;
-  const checkUsage = useMutation(api.usage.checkAndIncrementUsage);
-
-  const createCampaign = useMutation(api.outreachWorkspace.createCampaign);
-
-  const campaigns = useQuery(
-    api.outreachWorkspace.listCampaigns,
-    user?.id && selectedClientId
-      ? { clerkUserId: user.id, clientId: selectedClientId }
-      : "skip",
-  ) as Array<{
-    _id: string;
-    campaignName: string;
-    messageType: string;
-    status: string;
-    totalSent: number;
-    totalReplies: number;
-    totalBooked: number;
-    totalClosed: number;
-    startedAt?: number;
-    isDemo?: boolean;
-  }> | undefined;
-
-  const activeCount = campaigns?.filter((c) => c.status === "active").length || 0;
+  const campaigns = useQuery(api.outreachCampaigns.list, {}) as
+    | Campaign[]
+    | undefined;
 
   const stats = useMemo(() => {
-    const rows = campaigns || [];
+    const rows = campaigns ?? [];
     return {
-      sent: rows.reduce((sum, c) => sum + c.totalSent, 0),
-      replies: rows.reduce((sum, c) => sum + c.totalReplies, 0),
-      booked: rows.reduce((sum, c) => sum + c.totalBooked, 0),
-      closed: rows.reduce((sum, c) => sum + c.totalClosed, 0),
+      total: rows.length,
+      active: rows.filter((c) => c.status === "setup" || c.status === "active" || c.status === "running").length,
+      targets: rows.reduce((sum, c) => sum + (c.targetAccounts?.length ?? 0), 0),
     };
   }, [campaigns]);
 
-  const onLaunch = async () => {
-    if (!user?.id || !selectedClientId) return;
-    try {
-      const parsedTargets = targets
-        .split("\n")
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .map((instagramUsername) => ({ instagramUsername }));
-      
-      if (parsedTargets.length === 0) {
-        toast.error("Please add at least one target");
-        return;
-      }
-
-      const usageCheck = await checkUsage({
-        metric: "dailyDms",
-        increment: parsedTargets.length,
-      });
-
-      if (!usageCheck.success) {
-        setIsUpgradeModalOpen(true);
-        return;
-      }
-
-      await createCampaign({
-        clerkUserId: user.id,
-        clientId: selectedClientId,
-        campaignName: name.trim(),
-        platform: "instagram",
-        messageType,
-        script: script.trim(),
-        targets: parsedTargets,
-      });
-      setOpen(false);
-      setName("");
-      setScript("");
-      setTargets("");
-      toast.success("Campaign launched successfully");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to launch campaign");
-    }
-  };
-
-  if (!isOrgLoaded || (organization && convexOrg === undefined)) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center space-y-4">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
-          <div className="absolute inset-0 animate-pulse bg-primary/10 rounded-full blur-xl"></div>
-        </div>
-        <p className="text-sm text-muted-foreground animate-pulse font-bold tracking-widest uppercase">Syncing Communications...</p>
-      </div>
-    );
-  }
-
   return (
     <SideBar>
-      <motion.div 
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="mx-auto w-full max-w-7xl space-y-8 p-6 md:p-8"
-      >
-        <motion.div variants={item} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
+      <div className="mx-auto w-full max-w-6xl p-6 md:p-8 space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+        >
+          <div className="space-y-2">
             <div className="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-widest">
               <Send className="w-4 h-4" />
-              <span>Outreach Command</span>
+              <span>Get New Customers</span>
             </div>
-            <h1 className="text-4xl font-black tracking-tight text-white/90">Campaign Control</h1>
-            <p className="text-muted-foreground font-medium">Coordinate automated strikes and lead qualification.</p>
+            <h1 className="text-4xl font-black tracking-tight text-white/90">
+              {launcherOpen ? "Launch new outreach" : "Your outreach"}
+            </h1>
+            <p className="text-muted-foreground font-medium max-w-xl">
+              {launcherOpen
+                ? "Pick what kind of outreach you want to run. We'll save it as a campaign you can come back to."
+                : "Launch a new campaign or review past ones."}
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge className="hidden sm:flex h-9 px-4 text-xs font-bold bg-primary/10 text-primary border-primary/20 amber-glow items-center">
-              <Sparkles className="h-3.5 w-3.5 mr-2" />
-              {Math.max(0, limits.dailyDms - usageCount)} Payload Units Available
-            </Badge>
-            <Button onClick={() => setOpen(true)} className="h-11 px-6 font-black uppercase tracking-wider amber-glow rounded-xl">
-              <Plus className="h-4 w-4 mr-2 stroke-[3]" />
-              New Strike
+
+          {!launcherOpen && (
+            <Button
+              onClick={() => setLauncherOpen(true)}
+              className="h-12 px-6 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest amber-glow"
+            >
+              <Plus className="w-4 h-4 mr-2 stroke-3" />
+              Launch New
             </Button>
-          </div>
-        </motion.div>
+          )}
 
-        {/* Stats Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Active Strikes", val: activeCount, icon: Target, color: "text-primary" },
-            { label: "Total Sent", val: stats.sent, icon: Send, color: "text-white/80" },
-            { label: "Engagement", val: stats.replies, icon: MessageSquare, color: "text-amber-500" },
-            { label: "Pipeline Conversions", val: stats.booked, icon: BarChart3, color: "text-emerald-500" },
-          ].map((stat, i) => (
-            <motion.div variants={item} key={i}>
-              <div className="glass-card rounded-2xl p-6 border-white/5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className={cn("p-2 rounded-lg bg-white/5 border border-white/5", stat.color)}>
-                    <stat.icon className="w-4 h-4" />
-                  </div>
-                  <Badge variant="outline" className="text-[9px] border-white/5 text-muted-foreground font-black">24H</Badge>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{stat.label}</p>
-                  <p className={cn("text-3xl font-black tabular-nums tracking-tight", stat.color)}>{stat.val}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        <motion.div variants={item} className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
-              <Calendar className="w-4 h-4" /> Operational History
-            </h3>
-          </div>
-
-          {(!campaigns || campaigns.length === 0) ? (
-            <div className="glass-card rounded-[2rem] p-12 text-center border-dashed border-2 border-white/5">
-              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
-                <MessageSquare className="h-8 w-8 text-muted-foreground/30" />
-              </div>
-              <h3 className="text-xl font-bold text-white/90">No Active Deployments</h3>
-              <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                Initialize your first outreach protocol to begin generating high-intent responses.
-              </p>
-              <Button className="mt-8 amber-glow h-11 px-8 font-black uppercase tracking-widest rounded-xl" onClick={() => setOpen(true)}>
-                Deploy First Campaign
-              </Button>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              <AnimatePresence>
-                {campaigns.map((campaign, i) => (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    key={campaign._id} 
-                    className="glass-card rounded-2xl p-1 border-white/5 hover:border-primary/20 transition-all group"
-                  >
-                    <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="relative">
-                          <div className={cn(
-                            "w-12 h-12 rounded-xl flex items-center justify-center border border-white/10",
-                            campaign.status === "active" ? "bg-primary/20 text-primary amber-glow" : "bg-white/5 text-muted-foreground"
-                          )}>
-                            <Target className="w-6 h-6" />
-                          </div>
-                          {campaign.status === "active" && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-ping" />
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-3">
-                            <p className="font-bold text-lg text-white/90 tracking-tight">{campaign.campaignName}</p>
-                            <Badge className={cn(
-                              "text-[9px] font-black uppercase tracking-widest px-2 py-0.5",
-                              campaign.status === "active" ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/20" : "bg-white/10 text-muted-foreground border-white/5"
-                            )}>
-                              {campaign.status}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                              <span className="w-1 h-1 rounded-full bg-white/40" />
-                              {campaign.messageType.replace(/_/g, " ")}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                              <span className="w-1 h-1 rounded-full bg-white/40" />
-                              {campaign.totalSent} DEPLOYED
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs text-white/70 font-bold">
-                              <span className="w-1 h-1 rounded-full bg-primary" />
-                              {campaign.totalReplies} REPLIES
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-auto">
-                        <Button asChild variant="outline" className="h-10 px-5 font-bold border-white/5 bg-white/5 hover:bg-white/10 rounded-xl transition-all">
-                          <Link href={`/dashboard/outreach/${campaign._id}`}>
-                            Analytics Center <ArrowRight className="ml-2 w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+          {launcherOpen && (
+            <Button
+              variant="outline"
+              onClick={() => setLauncherOpen(false)}
+              className="h-11 px-5 rounded-xl border-white/10 hover:bg-white/5 font-bold"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to campaigns
+            </Button>
           )}
         </motion.div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-2xl bg-zinc-950 border-white/5 rounded-[2rem] p-8 shadow-2xl glass-card">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight text-white/90">Protocol Configuration</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6 mt-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Campaign Identifier</Label>
-                <Input 
-                  className="h-12 bg-white/5 border-white/5 rounded-xl px-4 font-medium focus:ring-primary/20 transition-all"
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  placeholder="E.g. Q2 Luxury Real Estate Blast"
-                />
+        {/* Launch flow */}
+        <AnimatePresence mode="wait">
+          {launcherOpen ? (
+            <motion.div
+              key="launcher"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
+              <ServiceFormsSettings
+                allowedServices={["real-estate", "general", "mass-dm"]}
+                title="Pick an outreach style"
+                description="Each option creates a saved campaign with your settings."
+                onSubmitted={() => setLauncherOpen(false)}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="space-y-8"
+            >
+              {/* Stats */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <StatCard label="Total Campaigns" value={stats.total} icon={Inbox} />
+                <StatCard label="Currently Running" value={stats.active} icon={Sparkles} accent />
+                <StatCard label="Targets Across All" value={stats.targets} icon={Target} />
               </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Strike Pattern</Label>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  {[
-                    ["account_outreach", "Infiltration"],
-                    ["mass_dm", "Saturation"],
-                    ["follow_up", "Re-Engagement"],
-                  ].map(([value, label]) => (
-                    <button
-                      key={value}
-                      className={cn(
-                        "h-11 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border",
-                        messageType === value 
-                          ? "bg-primary text-primary-foreground border-primary amber-glow" 
-                          : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
-                      )}
-                      onClick={() =>
-                        setMessageType(value as "account_outreach" | "mass_dm" | "follow_up")
-                      }
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Transmission Script (AI Enhanced)</Label>
-                <Textarea
-                  className="bg-white/5 border-white/5 rounded-2xl p-4 font-medium focus:ring-primary/20 transition-all min-h-[120px]"
-                  rows={4}
-                  value={script}
-                  onChange={(e) => setScript(e.target.value)}
-                  placeholder="Architect the primary messaging sequence..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Target Nodes (One @username per line)</Label>
-                <Textarea
-                  className="bg-white/5 border-white/5 rounded-2xl p-4 font-medium focus:ring-primary/20 transition-all min-h-[150px]"
-                  rows={5}
-                  value={targets}
-                  onChange={(e) => setTargets(e.target.value)}
-                  placeholder="@node_zero&#10;@node_one"
-                />
-              </div>
-              <Button
-                className="w-full h-14 rounded-2xl font-black uppercase tracking-wider amber-glow text-base mt-2"
-                disabled={!name.trim() || !script.trim() || !targets.trim()}
-                onClick={() => void onLaunch()}
-              >
-                Launch Protocol
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
-        <UpgradeModal 
-          isOpen={isUpgradeModalOpen} 
-          onOpenChange={setIsUpgradeModalOpen}
-          description={`Quota Limit Reached: Your current ${userPlan} protocol frequency of ${limits.dailyDms} daily DMs is exhausted. Elevate clearance level for high-volume saturation.`}
-        />
-      </motion.div>
+              {/* List */}
+              <Card className="glass-card border-white/5 overflow-hidden">
+                <CardHeader className="border-b border-white/5 bg-white/5">
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-primary" />
+                    Past Campaigns
+                  </CardTitle>
+                  <CardDescription>
+                    Every outreach campaign you&apos;ve launched, newest first.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 md:p-8">
+                  {campaigns === undefined && (
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  )}
+
+                  {campaigns !== undefined && campaigns.length === 0 && (
+                    <div className="text-center py-12 space-y-3">
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                        <MessageSquare className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">No campaigns yet.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Launch your first outreach to see it here.
+                      </p>
+                      <Button
+                        onClick={() => setLauncherOpen(true)}
+                        className="mt-4 h-11 px-6 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest amber-glow"
+                      >
+                        <Plus className="w-4 h-4 mr-2 stroke-3" />
+                        Launch First Campaign
+                      </Button>
+                    </div>
+                  )}
+
+                  {campaigns !== undefined && campaigns.length > 0 && (
+                    <ul className="space-y-3">
+                      {[...campaigns]
+                        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+                        .map((c) => {
+                          const meta =
+                            campaignTypeMeta[c.campaignType ?? ""] ?? {
+                              label: c.campaignType ?? "Outreach",
+                              icon: MessageSquare,
+                            };
+                          const Icon = meta.icon;
+                          return (
+                            <motion.li
+                              key={c._id}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="rounded-2xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                                  <Icon className="w-5 h-5 text-primary" />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-bold text-white/90">
+                                      {meta.label}
+                                    </p>
+                                    <Badge
+                                      className={cn(
+                                        "text-[9px] font-black uppercase tracking-widest border",
+                                        statusTone(c.status)
+                                      )}
+                                    >
+                                      {c.status ?? "draft"}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {c.instagramUsername
+                                      ? `@${c.instagramUsername.replace(/^@/, "")}`
+                                      : "—"}
+                                    {" · "}
+                                    {c.targetAccounts?.length
+                                      ? `${c.targetAccounts.length} targets`
+                                      : c.dmCount
+                                      ? `${c.dmCount} DMs`
+                                      : "no targets"}
+                                    {" · "}
+                                    {formatDate(c.createdAt)}
+                                  </p>
+                                </div>
+                              </div>
+                            </motion.li>
+                          );
+                        })}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </SideBar>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  accent,
+}: {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border p-5 space-y-3",
+        accent
+          ? "bg-primary/5 border-primary/20"
+          : "glass-card border-white/5"
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <div
+          className={cn(
+            "p-2 rounded-lg border",
+            accent
+              ? "bg-primary/10 border-primary/20 text-primary"
+              : "bg-white/5 border-white/5 text-muted-foreground"
+          )}
+        >
+          <Icon className="w-4 h-4" />
+        </div>
+      </div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          {label}
+        </p>
+        <p
+          className={cn(
+            "text-3xl font-black tabular-nums tracking-tight",
+            accent ? "text-primary" : "text-white/90"
+          )}
+        >
+          {value}
+        </p>
+      </div>
+    </div>
   );
 }

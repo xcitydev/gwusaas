@@ -792,6 +792,39 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_clerk_user_id", ["clerkUserId"]),
 
+  // ============================================================
+  // 7-Day Content Plan v2 — user-uploaded media + AI mapping.
+  // Replaces the old image-generation flow. The legacy tables
+  // (contentPipelineConfigs, contentPipelineRuns, viralTopics,
+  // refinedTopics, generatedContent) are left intact for now.
+  // ============================================================
+
+  contentPlanUploads: defineTable({
+    clerkUserId: v.string(),
+    storageId: v.id("_storage"),
+    filename: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
+    note: v.optional(v.string()), // user-supplied context ("client testimonial")
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
+
+  contentPlans: defineTable({
+    clerkUserId: v.string(),
+    weekStartDate: v.string(), // "YYYY-MM-DD"
+    brandName: v.optional(v.string()),
+    niche: v.optional(v.string()),
+    brandVoice: v.optional(v.string()),
+    uploadIds: v.array(v.id("contentPlanUploads")),
+    plan: v.any(), // JSON of day-by-day mapping
+    status: v.string(), // "ready" | "error"
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
+
   aiVisibilityProReports: defineTable({
     clerkUserId: v.string(),
     businessName: v.string(),

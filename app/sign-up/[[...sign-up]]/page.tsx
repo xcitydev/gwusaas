@@ -84,6 +84,8 @@ export default function SignUpPage() {
                 <Clerk.FieldError className={errorCls} />
               </Clerk.Field>
 
+              <SignUp.Captcha className="empty:hidden" />
+
               <SignUp.Action submit asChild>
                 <button type="submit" className={primaryBtnCls}>
                   <Clerk.Loading>
