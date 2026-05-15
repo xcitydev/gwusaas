@@ -6,6 +6,7 @@ import { AppSidebar } from "./app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useWhitelabel } from "@/context/WhitelabelContext";
+import { AssistantChat } from "@/components/assistant/AssistantChat";
 
 const SideBar = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
@@ -38,6 +39,8 @@ const SideBar = ({ children }: { children: React.ReactNode }) => {
           {children}
         </main>
       </div>
+
+      <AssistantChat />
     </div>
   );
 };

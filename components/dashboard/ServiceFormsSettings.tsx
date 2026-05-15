@@ -74,6 +74,64 @@ const emptyContent = {
 const labelCls = "text-xs font-black uppercase tracking-widest text-muted-foreground ml-1";
 const inputCls = "h-12 bg-white/5 border-white/5 rounded-xl px-4 font-medium focus:ring-primary/20";
 const textareaCls = "bg-white/5 border-white/5 rounded-2xl p-4 font-medium focus:ring-primary/20";
+const errorRingCls = "border-red-500/50 focus-visible:ring-red-500/30";
+
+function RequiredLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Label className={labelCls}>
+      {children} <span className="text-red-400">*</span>
+    </Label>
+  );
+}
+
+function FieldError({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="text-[10px] font-bold text-red-400 px-1">
+      This field is required.
+    </p>
+  );
+}
+
+function getMissingFields(
+  selected: ServiceType,
+  outreach: typeof emptyOutreach,
+  massDm: typeof emptyMassDm,
+  website: typeof emptyWebsite,
+  content: typeof emptyContent,
+): string[] {
+  const missing: string[] = [];
+  const need = (value: string, label: string) => {
+    if (!value.trim()) missing.push(label);
+  };
+
+  if (selected === "real-estate") {
+    need(outreach.username, "Instagram Username");
+    need(outreach.password, "Instagram Password");
+    need(outreach.idealClient, "Ideal Client Description");
+    need(outreach.targetLocations, "Target Locations");
+  } else if (selected === "general") {
+    need(outreach.username, "Instagram Username");
+    need(outreach.password, "Instagram Password");
+    need(outreach.idealClient, "Ideal Client Description");
+    need(outreach.targetAccounts, "Target Accounts");
+  } else if (selected === "mass-dm") {
+    need(massDm.trafficDestination, "Instagram Username (Destination)");
+    need(massDm.dmCount, "How many DMs?");
+    need(massDm.email, "Email");
+    need(massDm.targetAccounts, "Target Accounts");
+    need(massDm.outreachMessage, "Outreach Message");
+  } else if (selected === "website") {
+    need(website.title, "Project Title");
+    need(website.aboutUsSummary, "About Us / Team Summary");
+    need(website.features, "Must-Have Features");
+  } else if (selected === "content") {
+    need(content.designTexts, "Text for Each Design");
+    need(content.colors, "Brand Colors");
+  }
+
+  return missing;
+}
 
 type ServiceFormsSettingsProps = {
   /** Optional whitelist of service types to show. Defaults to all 5. */
@@ -95,6 +153,7 @@ export function ServiceFormsSettings({
   const { user } = useUser();
   const [selected, setSelected] = useState<ServiceType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   const visibleServices = allowedServices
     ? SERVICES.filter((s) => allowedServices.includes(s.id))
@@ -138,10 +197,29 @@ export function ServiceFormsSettings({
     setMassDmData(emptyMassDm);
     setWebsiteData(emptyWebsite);
     setContentData(emptyContent);
+    setAttempted(false);
   };
 
   const handleSubmit = async () => {
     if (!user?.id || !selected) return;
+
+    const missing = getMissingFields(
+      selected,
+      outreachData,
+      massDmData,
+      websiteData,
+      contentData,
+    );
+    if (missing.length > 0) {
+      setAttempted(true);
+      toast.error(
+        missing.length === 1
+          ? `Please fill in: ${missing[0]}`
+          : `Please fill in ${missing.length} required fields.`,
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (selected === "real-estate") {
@@ -273,23 +351,31 @@ export function ServiceFormsSettings({
         {(selected === "real-estate" || selected === "general") && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label className={labelCls}>Instagram Username</Label>
+              <RequiredLabel>Instagram Username</RequiredLabel>
               <Input
-                className={inputCls}
+                className={cn(
+                  inputCls,
+                  attempted && !outreachData.username.trim() && errorRingCls,
+                )}
                 value={outreachData.username}
                 onChange={(e) => setOutreachData({ ...outreachData, username: e.target.value })}
                 placeholder="@username"
               />
+              <FieldError show={attempted && !outreachData.username.trim()} />
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Instagram Password</Label>
+              <RequiredLabel>Instagram Password</RequiredLabel>
               <Input
                 type="password"
-                className={inputCls}
+                className={cn(
+                  inputCls,
+                  attempted && !outreachData.password.trim() && errorRingCls,
+                )}
                 value={outreachData.password}
                 onChange={(e) => setOutreachData({ ...outreachData, password: e.target.value })}
                 placeholder="••••••••"
               />
+              <FieldError show={attempted && !outreachData.password.trim()} />
               <p className="text-[10px] text-muted-foreground italic px-1">Confidential: Only used for automated messaging.</p>
             </div>
             <div className="space-y-2">
@@ -310,33 +396,48 @@ export function ServiceFormsSettings({
               </div>
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Ideal Client Description</Label>
+              <RequiredLabel>Ideal Client Description</RequiredLabel>
               <Textarea
-                className={cn(textareaCls, "min-h-[120px]")}
+                className={cn(
+                  textareaCls,
+                  "min-h-[120px]",
+                  attempted && !outreachData.idealClient.trim() && errorRingCls,
+                )}
                 value={outreachData.idealClient}
                 onChange={(e) => setOutreachData({ ...outreachData, idealClient: e.target.value })}
                 placeholder="Age range, profession, income, buying motivations..."
               />
+              <FieldError show={attempted && !outreachData.idealClient.trim()} />
             </div>
             {selected === "real-estate" ? (
               <div className="space-y-2">
-                <Label className={labelCls}>Target Locations (Cities/ZIPs)</Label>
+                <RequiredLabel>Target Locations (Cities/ZIPs)</RequiredLabel>
                 <Textarea
-                  className={cn(textareaCls, "min-h-[100px]")}
+                  className={cn(
+                    textareaCls,
+                    "min-h-[100px]",
+                    attempted && !outreachData.targetLocations.trim() && errorRingCls,
+                  )}
                   value={outreachData.targetLocations}
                   onChange={(e) => setOutreachData({ ...outreachData, targetLocations: e.target.value })}
                   placeholder="New York, 90210, Beverly Hills..."
                 />
+                <FieldError show={attempted && !outreachData.targetLocations.trim()} />
               </div>
             ) : (
               <div className="space-y-2">
-                <Label className={labelCls}>10 Target Accounts (@handles)</Label>
+                <RequiredLabel>10 Target Accounts (@handles)</RequiredLabel>
                 <Textarea
-                  className={cn(textareaCls, "min-h-[120px]")}
+                  className={cn(
+                    textareaCls,
+                    "min-h-[120px]",
+                    attempted && !outreachData.targetAccounts.trim() && errorRingCls,
+                  )}
                   value={outreachData.targetAccounts}
                   onChange={(e) => setOutreachData({ ...outreachData, targetAccounts: e.target.value })}
                   placeholder={"@competitor1\n@competitor2..."}
                 />
+                <FieldError show={attempted && !outreachData.targetAccounts.trim()} />
               </div>
             )}
             <div className="space-y-4">
@@ -388,23 +489,31 @@ export function ServiceFormsSettings({
         {selected === "mass-dm" && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label className={labelCls}>Instagram Username (Destination)</Label>
+              <RequiredLabel>Instagram Username (Destination)</RequiredLabel>
               <Input
-                className={inputCls}
+                className={cn(
+                  inputCls,
+                  attempted && !massDmData.trafficDestination.trim() && errorRingCls,
+                )}
                 value={massDmData.trafficDestination}
                 onChange={(e) => setMassDmData({ ...massDmData, trafficDestination: e.target.value })}
                 placeholder="@yourhandle"
               />
+              <FieldError show={attempted && !massDmData.trafficDestination.trim()} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className={labelCls}>How many DMs?</Label>
+                <RequiredLabel>How many DMs?</RequiredLabel>
                 <Input
-                  className={inputCls}
+                  className={cn(
+                    inputCls,
+                    attempted && !massDmData.dmCount.trim() && errorRingCls,
+                  )}
                   value={massDmData.dmCount}
                   onChange={(e) => setMassDmData({ ...massDmData, dmCount: e.target.value })}
                   placeholder="10,000"
                 />
+                <FieldError show={attempted && !massDmData.dmCount.trim()} />
               </div>
               <div className="space-y-2">
                 <Label className={labelCls}>Phone Number</Label>
@@ -417,34 +526,48 @@ export function ServiceFormsSettings({
               </div>
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Email</Label>
+              <RequiredLabel>Email</RequiredLabel>
               <Input
-                className={inputCls}
+                className={cn(
+                  inputCls,
+                  attempted && !massDmData.email.trim() && errorRingCls,
+                )}
                 value={massDmData.email}
                 onChange={(e) => setMassDmData({ ...massDmData, email: e.target.value })}
                 placeholder="your@email.com"
               />
+              <FieldError show={attempted && !massDmData.email.trim()} />
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Ideal Target Accounts (Vertical List)</Label>
+              <RequiredLabel>Ideal Target Accounts (Vertical List)</RequiredLabel>
               <Textarea
-                className={cn(textareaCls, "min-h-[160px]")}
+                className={cn(
+                  textareaCls,
+                  "min-h-[160px]",
+                  attempted && !massDmData.targetAccounts.trim() && errorRingCls,
+                )}
                 value={massDmData.targetAccounts}
                 onChange={(e) => setMassDmData({ ...massDmData, targetAccounts: e.target.value })}
                 placeholder={"@handle1\n@handle2\n@handle3..."}
               />
+              <FieldError show={attempted && !massDmData.targetAccounts.trim()} />
               <p className="text-[10px] text-muted-foreground italic px-1">
                 Note: Please select accounts with &lt;10k followers for best results.
               </p>
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Ideal Outreach Message</Label>
+              <RequiredLabel>Ideal Outreach Message</RequiredLabel>
               <Textarea
-                className={cn(textareaCls, "min-h-[160px]")}
+                className={cn(
+                  textareaCls,
+                  "min-h-[160px]",
+                  attempted && !massDmData.outreachMessage.trim() && errorRingCls,
+                )}
                 value={massDmData.outreachMessage}
                 onChange={(e) => setMassDmData({ ...massDmData, outreachMessage: e.target.value })}
                 placeholder="Write your draft here. We will touch it up for best conversion."
               />
+              <FieldError show={attempted && !massDmData.outreachMessage.trim()} />
             </div>
             <div className="space-y-2">
               <Label className={labelCls}>Questions and Comments</Label>
@@ -461,13 +584,17 @@ export function ServiceFormsSettings({
         {selected === "website" && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label className={labelCls}>Project Title</Label>
+              <RequiredLabel>Project Title</RequiredLabel>
               <Input
-                className={inputCls}
+                className={cn(
+                  inputCls,
+                  attempted && !websiteData.title.trim() && errorRingCls,
+                )}
                 value={websiteData.title}
                 onChange={(e) => setWebsiteData({ ...websiteData, title: e.target.value })}
                 placeholder="My New Business Website"
               />
+              <FieldError show={attempted && !websiteData.title.trim()} />
             </div>
             <div className="space-y-2">
               <Label className={labelCls}>Google Drive Folder Link</Label>
@@ -505,22 +632,32 @@ export function ServiceFormsSettings({
               </div>
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>About Us / Team Summary</Label>
+              <RequiredLabel>About Us / Team Summary</RequiredLabel>
               <Textarea
-                className={cn(textareaCls, "min-h-[160px]")}
+                className={cn(
+                  textareaCls,
+                  "min-h-[160px]",
+                  attempted && !websiteData.aboutUsSummary.trim() && errorRingCls,
+                )}
                 value={websiteData.aboutUsSummary}
                 onChange={(e) => setWebsiteData({ ...websiteData, aboutUsSummary: e.target.value })}
                 placeholder="A summary we can place on the About Us page."
               />
+              <FieldError show={attempted && !websiteData.aboutUsSummary.trim()} />
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Must-Have Features</Label>
+              <RequiredLabel>Must-Have Features</RequiredLabel>
               <Textarea
-                className={cn(textareaCls, "min-h-[100px]")}
+                className={cn(
+                  textareaCls,
+                  "min-h-[100px]",
+                  attempted && !websiteData.features.trim() && errorRingCls,
+                )}
                 value={websiteData.features}
                 onChange={(e) => setWebsiteData({ ...websiteData, features: e.target.value })}
                 placeholder="Contact form, booking system, e-commerce, etc."
               />
+              <FieldError show={attempted && !websiteData.features.trim()} />
             </div>
             <div className="space-y-2">
               <Label className={labelCls}>Brand Elements</Label>
@@ -537,13 +674,18 @@ export function ServiceFormsSettings({
         {selected === "content" && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label className={labelCls}>Text for Each Design (Numbered List)</Label>
+              <RequiredLabel>Text for Each Design (Numbered List)</RequiredLabel>
               <Textarea
-                className={cn(textareaCls, "min-h-[120px]")}
+                className={cn(
+                  textareaCls,
+                  "min-h-[120px]",
+                  attempted && !contentData.designTexts.trim() && errorRingCls,
+                )}
                 value={contentData.designTexts}
                 onChange={(e) => setContentData({ ...contentData, designTexts: e.target.value })}
                 placeholder={"1. Text for first post\n2. Text for second post..."}
               />
+              <FieldError show={attempted && !contentData.designTexts.trim()} />
             </div>
             <div className="space-y-2">
               <Label className={labelCls}>Design Examples / Similar Styles</Label>
@@ -555,13 +697,17 @@ export function ServiceFormsSettings({
               />
             </div>
             <div className="space-y-2">
-              <Label className={labelCls}>Brand Colors</Label>
+              <RequiredLabel>Brand Colors</RequiredLabel>
               <Input
-                className={inputCls}
+                className={cn(
+                  inputCls,
+                  attempted && !contentData.colors.trim() && errorRingCls,
+                )}
                 value={contentData.colors}
                 onChange={(e) => setContentData({ ...contentData, colors: e.target.value })}
                 placeholder="Primary colors to use."
               />
+              <FieldError show={attempted && !contentData.colors.trim()} />
             </div>
             <div className="space-y-2">
               <Label className={labelCls}>Google Drive Link (Labeled Pictures)</Label>
