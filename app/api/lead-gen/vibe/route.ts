@@ -35,7 +35,10 @@ type VibeLead = {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePlan("growth");
+    const guard = await requirePlan("growth", {
+      rateLimit: "scrape",
+      consumeUsage: "dailyLeadScrapes",
+    });
     if (!guard.ok) return guard.response;
 
     const parsed = bodySchema.safeParse(await req.json());

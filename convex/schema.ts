@@ -79,7 +79,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_clerk_user_id", ["clerkUserId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    // Hot path: ceo.ts + projects.ts list("active") for a user.
+    .index("by_clerk_user_id_status", ["clerkUserId", "status"]),
 
   onboardingResponse: defineTable({
     projectId: v.id("project"),
@@ -173,8 +175,10 @@ export default defineSchema({
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_organization_id", ["organizationId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_clerk_user_id_status", ["clerkUserId", "status"]),
 
+  // Compound (clerkUserId, status) added below for hot list-by-status query.
   outreachCampaign: defineTable({
     clerkUserId: v.string(),
     organizationId: v.optional(v.id("organizations")),
@@ -199,7 +203,8 @@ export default defineSchema({
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_organization_id", ["organizationId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_clerk_user_id_status", ["clerkUserId", "status"]),
 
   dmCampaigns: defineTable({
     ownerUserId: v.string(),
@@ -341,7 +346,8 @@ export default defineSchema({
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_content_type", ["contentType"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_clerk_user_id_status", ["clerkUserId", "status"]),
 
   seoAudits: defineTable({
     userId: v.string(),
@@ -363,7 +369,10 @@ export default defineSchema({
     input: v.any(),
     output: v.any(),
     createdAt: v.number(),
-  }).index("by_user_id", ["userId"]),
+  })
+    .index("by_user_id", ["userId"])
+    // Hot path: aiHistory.list({ userId, type }) currently scans + filters.
+    .index("by_user_id_type", ["userId", "type"]),
 
   graphics: defineTable({
     ideaTitle: v.string(),
@@ -385,6 +394,12 @@ export default defineSchema({
     locationName: v.string(),
     isActive: v.boolean(),
     createdAt: v.number(),
+    // Encrypted GHL Private Integration / Location API key for this business.
+    // Optional for backward compatibility with rows created before per-business keys.
+    encryptedApiKey: v.optional(v.string()),
+    // Where the GHL account came from: "existing" (user already had GHL) or
+    // "affiliate" (user signed up through our affiliate link).
+    signupSource: v.optional(v.string()),
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_location_id", ["locationId"])
@@ -617,13 +632,47 @@ export default defineSchema({
     clerkUserId: v.string(),
     referralCode: v.string(),
     totalReferrals: v.number(),
+    /** Lifetime paid-out commission, in cents. */
     totalEarned: v.number(),
+    /** Earned but not yet paid (e.g. user upgraded but commission not disbursed). */
+    pendingEarnings: v.optional(v.number()),
+    /** Decimal commission rate. Default 0.30 (30%). */
+    commissionRate: v.optional(v.number()),
     status: v.string(), // "active" | "paused"
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_referral_code", ["referralCode"]),
+
+  /**
+   * One row per attributed referral. Created when a new user signs up with
+   * a ?ref=… code; updated when that user upgrades to a paid plan to record
+   * the commission earned by the referrer.
+   */
+  referrals: defineTable({
+    referrerClerkUserId: v.string(),
+    referredClerkUserId: v.string(),
+    referralCode: v.string(),
+    referredEmail: v.optional(v.string()),
+    referredName: v.optional(v.string()),
+    /** "signed_up" → "trialing" → "paid" → "cancelled" / "refunded" */
+    status: v.string(),
+    /** Plan the referred user is on. */
+    plan: v.optional(v.string()),
+    /** Cents earned by the referrer for this referral so far. */
+    commissionCents: v.number(),
+    /** Whether the commission has been disbursed to the referrer. */
+    commissionPaid: v.boolean(),
+    signedUpAt: v.number(),
+    convertedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_referrer", ["referrerClerkUserId"])
+    .index("by_referred", ["referredClerkUserId"])
+    .index("by_referral_code", ["referralCode"])
+    .index("by_referrer_status", ["referrerClerkUserId", "status"]),
 
   videoProjects: defineTable({
     clerkUserId: v.string(),
@@ -729,4 +778,30 @@ export default defineSchema({
     .index("by_call_sid", ["callSid"])
     .index("by_vapi_call_id", ["vapiCallId"])
     .index("by_client_id_created_at", ["clientId", "createdAt"]),
+
+  // ============================================================
+  // AI Visibility Pro — saved AI Search Optimization reports + credits.
+  // Self-contained feature; does NOT use the existing plan-based
+  // dailyAiGenerations limiter. Tables are namespaced with
+  // "aiVisibilityPro" so they're easy to find and remove.
+  // ============================================================
+
+  aiVisibilityProCredits: defineTable({
+    clerkUserId: v.string(),
+    credits: v.number(),
+    updatedAt: v.number(),
+  }).index("by_clerk_user_id", ["clerkUserId"]),
+
+  aiVisibilityProReports: defineTable({
+    clerkUserId: v.string(),
+    businessName: v.string(),
+    industry: v.string(),
+    audience: v.string(),
+    location: v.optional(v.string()),
+    services: v.string(),
+    result: v.any(), // full AI JSON response
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
 });

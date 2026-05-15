@@ -139,7 +139,10 @@ function normalizeSequence(
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePlan("starter");
+    const guard = await requirePlan("starter", {
+      rateLimit: "ai",
+      consumeUsage: "dailyAiGenerations",
+    });
     if (!guard.ok) {
       return guard.response;
     }

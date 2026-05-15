@@ -1,47 +1,139 @@
-"use client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { 
+"use client";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Copy, Share2, Gift, Users, DollarSign, TrendingUp, Mail, Link } from 'lucide-react'
-import SideBar from "@/components/SideBar"
-import { useUser } from "@clerk/nextjs"
-import { useQuery, useMutation } from "convex/react"
-import { api } from "@/convex/_generated/api"
-import { useEffect } from "react"
-import { toast } from "sonner"
+} from "@/components/ui/table";
+import {
+  Copy,
+  Share2,
+  Gift,
+  Users,
+  DollarSign,
+  TrendingUp,
+  Mail,
+} from "lucide-react";
+import SideBar from "@/components/SideBar";
+import { useUser } from "@clerk/nextjs";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useEffect, useMemo } from "react";
+import { toast } from "sonner";
+import { PLAN_LABELS, type Plan } from "@/lib/plans";
+
+type ReferralRow = {
+  _id: string;
+  referredClerkUserId: string;
+  referredEmail?: string;
+  referredName?: string;
+  plan?: string;
+  status: string;
+  commissionCents: number;
+  commissionPaid: boolean;
+  signedUpAt: number;
+  convertedAt?: number;
+};
+
+function formatUsd(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatDate(ms: number): string {
+  return new Date(ms).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function statusBadge(status: string): { label: string; tone: string } {
+  switch (status) {
+    case "paid":
+      return {
+        label: "Paid",
+        tone: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+      };
+    case "trialing":
+      return {
+        label: "Trialing",
+        tone: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+      };
+    case "cancelled":
+    case "refunded":
+      return {
+        label: status === "refunded" ? "Refunded" : "Cancelled",
+        tone: "bg-red-500/15 text-red-400 border-red-500/30",
+      };
+    default:
+      return {
+        label: "Signed up",
+        tone: "bg-white/5 text-muted-foreground border-white/10",
+      };
+  }
+}
 
 export default function ReferralProgramPage() {
-  const { user, isLoaded } = useUser()
-  const referralData = useQuery(api.referrals.get)
-  const initReferral = useMutation(api.referrals.init)
+  const { user, isLoaded } = useUser();
+  const referralData = useQuery(api.referrals.get);
+  const myReferrals = useQuery(api.referrals.listMyReferrals) as
+    | ReferralRow[]
+    | undefined;
+  const initReferral = useMutation(api.referrals.init);
 
+  // Bootstrap the user's referral row on first visit.
   useEffect(() => {
-    if (isLoaded && user && !referralData) {
-      initReferral().catch(err => {
-        console.error("Failed to init referral program:", err)
-      })
+    if (isLoaded && user && referralData === null) {
+      initReferral().catch((err) => {
+        console.error("Failed to init referral program:", err);
+      });
     }
-  }, [isLoaded, user, referralData, initReferral])
+  }, [isLoaded, user, referralData, initReferral]);
 
-  const referralLink = referralData 
-    ? `https://agency.com/ref/${referralData.referralCode}`
-    : "Loading..."
+  // Build the referral link off the *real* origin so it works on whatever
+  // domain (custom white-label, localhost, prod) the user is currently on.
+  const referralLink = useMemo(() => {
+    if (!referralData?.referralCode) return "";
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    return origin
+      ? `${origin}/sign-up?ref=${referralData.referralCode}`
+      : `/sign-up?ref=${referralData.referralCode}`;
+  }, [referralData?.referralCode]);
+
+  const commissionPct = Math.round(
+    (referralData?.commissionRate ?? 0.3) * 100,
+  );
+
+  // Total earned = paid out so far. Pending = earned but not yet disbursed.
+  const totalEarnedCents = referralData?.totalEarned ?? 0;
+  const pendingCents = referralData?.pendingEarnings ?? 0;
+  const lifetimeCents = totalEarnedCents + pendingCents;
 
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c79b09]"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -53,13 +145,18 @@ export default function ReferralProgramPage() {
               Referral Program
             </h2>
             <p className="text-muted-foreground">
-              Earn rewards by referring new clients to our services
+              Earn {commissionPct}% of every plan paid by people you refer —
+              for as long as they stay subscribed.
             </p>
           </div>
-          <Button onClick={() => {
-            navigator.clipboard.writeText(referralLink)
-            toast.success("Referral link copied!")
-          }}>
+          <Button
+            disabled={!referralLink}
+            onClick={() => {
+              if (!referralLink) return;
+              navigator.clipboard.writeText(referralLink);
+              toast.success("Referral link copied!");
+            }}
+          >
             <Share2 className="h-4 w-4 mr-2" />
             Share Link
           </Button>
@@ -74,7 +171,9 @@ export default function ReferralProgramPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{referralData?.totalReferrals || 0}</div>
+              <div className="text-2xl font-bold">
+                {referralData?.totalReferrals ?? 0}
+              </div>
               <p className="text-xs text-muted-foreground">Across all time</p>
             </CardContent>
           </Card>
@@ -86,9 +185,13 @@ export default function ReferralProgramPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden text-ellipsis">
-                ${referralData?.totalEarned.toLocaleString() || 0}
+                {formatUsd(lifetimeCents)}
               </div>
-              <p className="text-xs text-muted-foreground">Total paid out</p>
+              <p className="text-xs text-muted-foreground">
+                {pendingCents > 0
+                  ? `${formatUsd(pendingCents)} pending payout`
+                  : "Lifetime"}
+              </p>
             </CardContent>
           </Card>
 
@@ -98,7 +201,9 @@ export default function ReferralProgramPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold capitalize">{referralData?.status || "Loading..."}</div>
+              <div className="text-2xl font-bold capitalize">
+                {referralData?.status ?? "Loading..."}
+              </div>
               <p className="text-xs text-muted-foreground">Program status</p>
             </CardContent>
           </Card>
@@ -109,7 +214,9 @@ export default function ReferralProgramPage() {
               <Gift className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold truncate">{referralData?.referralCode || "---"}</div>
+              <div className="text-2xl font-bold truncate font-mono">
+                {referralData?.referralCode ?? "---"}
+              </div>
               <p className="text-xs text-muted-foreground">Your unique ID</p>
             </CardContent>
           </Card>
@@ -120,17 +227,24 @@ export default function ReferralProgramPage() {
             <CardHeader>
               <CardTitle>Your Referral Link</CardTitle>
               <CardDescription>
-                Share this link with potential clients to earn rewards
+                Share this link — anyone who signs up through it earns you{" "}
+                {commissionPct}% of every paid plan they buy, for the
+                lifetime of their subscription.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-2">
-                <Input value={referralLink} readOnly />
+                <Input
+                  value={referralLink || "Loading..."}
+                  readOnly
+                  className="font-mono text-xs"
+                />
                 <Button
                   size="sm"
+                  disabled={!referralLink}
                   onClick={() => {
-                    navigator.clipboard.writeText(referralLink)
-                    toast.success("Link copied!")
+                    navigator.clipboard.writeText(referralLink);
+                    toast.success("Link copied!");
                   }}
                 >
                   <Copy className="h-4 w-4" />
@@ -140,9 +254,14 @@ export default function ReferralProgramPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!referralLink}
                   onClick={() => {
-                    const subject = encodeURIComponent("Check out this growth platform");
-                    const body = encodeURIComponent(`Hey! I've been using this platform to grow my business and thought you might like it: ${referralLink}`);
+                    const subject = encodeURIComponent(
+                      "Check out this growth platform",
+                    );
+                    const body = encodeURIComponent(
+                      `Hey! I've been using this platform to grow my business and thought you might like it: ${referralLink}`,
+                    );
                     window.location.href = `mailto:?subject=${subject}&body=${body}`;
                   }}
                 >
@@ -152,9 +271,15 @@ export default function ReferralProgramPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!referralLink}
                   onClick={() => {
-                    const text = encodeURIComponent(`Growing my business with this platform. Check it out: ${referralLink}`);
-                    window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
+                    const text = encodeURIComponent(
+                      `Growing my business with this platform. Check it out: ${referralLink}`,
+                    );
+                    window.open(
+                      `https://twitter.com/intent/tweet?text=${text}`,
+                      "_blank",
+                    );
                   }}
                 >
                   <Share2 className="h-4 w-4 mr-2" />
@@ -166,30 +291,43 @@ export default function ReferralProgramPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Reward Structure</CardTitle>
+              <CardTitle>How commission works</CardTitle>
               <CardDescription>
-                Earn commissions based on the services your referrals purchase
+                Flat {commissionPct}% on every paid plan, every month, for as
+                long as your referrals stay subscribed.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Social Media Management</span>
-                  <Badge variant="secondary">15% commission</Badge>
+                  <span className="text-sm">Starter — $39/mo</span>
+                  <Badge variant="secondary">
+                    {formatUsd(Math.round(3900 * (commissionPct / 100)))}/mo
+                  </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Website Development</span>
-                  <Badge variant="secondary">10% commission</Badge>
+                  <span className="text-sm">Growth — $149/mo</span>
+                  <Badge variant="secondary">
+                    {formatUsd(Math.round(14900 * (commissionPct / 100)))}/mo
+                  </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Video Production</span>
-                  <Badge variant="secondary">12% commission</Badge>
+                  <span className="text-sm">Elite — $399/mo</span>
+                  <Badge variant="secondary">
+                    {formatUsd(Math.round(39900 * (commissionPct / 100)))}/mo
+                  </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Content Creation</span>
-                  <Badge variant="secondary">20% commission</Badge>
+                  <span className="text-sm">White Label — $999/mo</span>
+                  <Badge variant="secondary">
+                    {formatUsd(Math.round(99900 * (commissionPct / 100)))}/mo
+                  </Badge>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                Commissions accrue on the day each referral renews. Refunds
+                claw back the matching commission.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -208,19 +346,68 @@ export default function ReferralProgramPage() {
                   <TableRow>
                     <TableHead>Referred Client</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Service</TableHead>
+                    <TableHead>Plan</TableHead>
                     <TableHead>Signup Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Reward</TableHead>
+                    <TableHead className="text-right">Reward</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* History table would be populated from a separate join table in the future */}
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No referrals found yet. Share your link to get started!
-                    </TableCell>
-                  </TableRow>
+                  {!myReferrals && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        Loading referrals…
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {myReferrals && myReferrals.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        No referrals found yet. Share your link to get
+                        started!
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {myReferrals?.map((r) => {
+                    const badge = statusBadge(r.status);
+                    return (
+                      <TableRow key={r._id}>
+                        <TableCell className="font-medium">
+                          {r.referredName || "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.referredEmail || "—"}
+                        </TableCell>
+                        <TableCell>
+                          {r.plan
+                            ? PLAN_LABELS[r.plan as Plan] ?? r.plan
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(r.signedUpAt)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={badge.tone}
+                          >
+                            {badge.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {r.commissionCents > 0
+                            ? formatUsd(r.commissionCents)
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

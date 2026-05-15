@@ -13,7 +13,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const guard = await requireVoiceCallerAccess();
+  const guard = await requireVoiceCallerAccess({ rateLimit: "media" });
   if (!guard.ok) return guard.response;
 
   const apiKey = process.env.ELEVENLABS_API_KEY;

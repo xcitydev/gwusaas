@@ -17,6 +17,9 @@ import { Key, Shield } from "lucide-react";
 
 import { BrandOnboardingSettings } from "@/components/dashboard/BrandOnboardingSettings";
 import { StrategySettings } from "@/components/dashboard/StrategySettings";
+import { GHLIntegrationSettings } from "@/components/dashboard/GHLIntegrationSettings";
+import { VoiceReplySettings } from "@/components/dashboard/VoiceReplySettings";
+import { ServiceFormsSettings } from "@/components/dashboard/ServiceFormsSettings";
 
 export default function SettingsPage() {
   const { user, isLoaded } = useUser();
@@ -82,7 +85,10 @@ export default function SettingsPage() {
         <Tabs defaultValue="instagram" className="space-y-6">
           <TabsList className="bg-white/5 border border-white/5 p-1 h-12">
             <TabsTrigger value="instagram" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Instagram</TabsTrigger>
+            <TabsTrigger value="ghl" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">GoHighLevel</TabsTrigger>
+            <TabsTrigger value="voice" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Voice</TabsTrigger>
             <TabsTrigger value="strategy" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Brand & Strategy</TabsTrigger>
+            <TabsTrigger value="services" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Service Requests</TabsTrigger>
             <TabsTrigger value="team" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Team</TabsTrigger>
           </TabsList>
 
@@ -126,9 +132,21 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="ghl">
+            <GHLIntegrationSettings />
+          </TabsContent>
+
+          <TabsContent value="voice">
+            <VoiceReplySettings />
+          </TabsContent>
+
           <TabsContent value="strategy" className="space-y-6">
             {user?.id && <BrandOnboardingSettings clerkUserId={user.id} />}
             {user?.id && <StrategySettings userId={user.id} />}
+          </TabsContent>
+
+          <TabsContent value="services">
+            <ServiceFormsSettings />
           </TabsContent>
 
           <TabsContent value="team">

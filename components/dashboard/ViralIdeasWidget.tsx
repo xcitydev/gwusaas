@@ -16,9 +16,9 @@ const platforms = ["all", "youtube", "instagram", "tiktok", "substack", "reddit"
 const categories = ["all", "client attraction", "education", "social proof", "controversy", "trend"] as const;
 
 const loadingMessages = [
-  "Scouring the social graph...",
-  "Synthesizing high-intent angles...",
-  "Architecting your content strategy...",
+  "Looking at what's trending...",
+  "Finding ideas your audience will love...",
+  "Putting it all together...",
 ];
 
 export function ViralIdeasWidget() {
@@ -67,13 +67,6 @@ export function ViralIdeasWidget() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!config) return;
-    if (ideas.length > 0) return;
-    void generate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config]);
 
   useEffect(() => {
     if (!loading) return;
@@ -126,8 +119,8 @@ export function ViralIdeasWidget() {
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-white/90">Viral Insights</h3>
-              <p className="text-xs font-medium text-muted-foreground">AI-Engineered Content Strategy</p>
+              <h3 className="text-xl font-black text-white/90">Viral Ideas</h3>
+              <p className="text-xs font-medium text-muted-foreground">Content ideas built to grow your business</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -137,7 +130,7 @@ export function ViralIdeasWidget() {
             </div>
             <Button onClick={() => void generate()} disabled={loading || !config} className="h-9 px-4 text-xs font-bold amber-glow transition-all">
               <RefreshCw className={cn("mr-2 h-3.5 w-3.5", loading && "animate-spin")} />
-              Sync Engine
+              Get New Ideas
             </Button>
           </div>
         </div>
@@ -190,7 +183,7 @@ export function ViralIdeasWidget() {
           {!config ? (
             <div className="flex flex-col items-center justify-center p-12 text-center glass-card rounded-3xl border-dashed">
               <Sparkles className="w-8 h-8 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-sm font-medium text-muted-foreground">Configure your Content Pipeline seeds to activate Viral Insights.</p>
+              <p className="text-sm font-medium text-muted-foreground">Set up your 7-Day Content Plan first to unlock viral ideas.</p>
             </div>
           ) : loading ? (
             <div className="space-y-6">
@@ -206,7 +199,7 @@ export function ViralIdeasWidget() {
             </div>
           ) : visibleIdeas.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-center glass-card rounded-3xl">
-              <Button onClick={() => void generate()} className="amber-glow h-11 px-8 font-black uppercase tracking-wider">Initialize Generation</Button>
+              <Button onClick={() => void generate()} className="amber-glow h-11 px-8 font-black uppercase tracking-wider">Get Ideas</Button>
             </div>
           ) : (
             <div className="space-y-6">
@@ -222,7 +215,7 @@ export function ViralIdeasWidget() {
               </div>
               {freeLocked && filtered.length > 5 ? (
                 <div className="p-6 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
-                  <p className="text-sm font-bold text-primary/80">Upgrade to unlock 25+ more tactical ideas.</p>
+                  <p className="text-sm font-bold text-primary/80">Upgrade to unlock 25+ more ideas.</p>
                   <Button variant="outline" className="h-8 text-[10px] font-black border-primary/20 text-primary uppercase tracking-widest">Upgrade Now</Button>
                 </div>
               ) : null}

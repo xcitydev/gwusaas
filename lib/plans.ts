@@ -58,6 +58,26 @@ export const PLAN_LABELS: Record<Plan, string> = {
   white_label: "White Label",
 };
 
+/**
+ * Monthly retail price per plan, in cents. Used for referral-commission
+ * calculation and any other "what does this plan cost" math. Update here
+ * if pricing changes — referral payouts and any future Stripe integration
+ * should both read from this single source.
+ */
+export const PLAN_PRICE_CENTS: Record<Plan, number> = {
+  free: 0,
+  starter: 3900, // $39
+  growth: 14900, // $149
+  elite: 39900, // $399
+  white_label: 99900, // $999
+};
+
+/**
+ * Default referral commission rate. Applied to the referred user's monthly
+ * plan price on every successful upgrade.
+ */
+export const DEFAULT_REFERRAL_COMMISSION_RATE = 0.3;
+
 const PLAN_SERVICE_IDS: Record<Plan, string[]> = {
   free: [],
   starter: [

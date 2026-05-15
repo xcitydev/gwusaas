@@ -256,7 +256,7 @@ export default function OnboardingPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
           <div className="absolute inset-0 animate-pulse bg-primary/10 rounded-full blur-xl"></div>
         </div>
-        <p className="text-sm text-muted-foreground animate-pulse">Initializing protocols...</p>
+        <p className="text-sm text-muted-foreground animate-pulse">Loading your workspace...</p>
       </div>
     );
   }
@@ -270,9 +270,9 @@ export default function OnboardingPage() {
             <CheckCircle className="w-10 h-10 text-primary" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tight text-white/90">Initialization Complete</h1>
+            <h1 className="text-4xl font-black tracking-tight text-white/90">You're All Set</h1>
             <p className="text-muted-foreground font-medium">
-              You have already finished the onboarding process.
+              You have already finished setup.
             </p>
           </div>
           <div className="flex flex-col gap-4 mt-8">
@@ -280,7 +280,7 @@ export default function OnboardingPage() {
               className="h-14 rounded-2xl bg-primary text-black font-black uppercase tracking-widest amber-glow"
               onClick={() => router.push("/dashboard")}
             >
-              Return to Dashboard
+              Go to Home
             </Button>
             <Button 
               variant="outline"
@@ -307,21 +307,21 @@ export default function OnboardingPage() {
           <div className="space-y-2 text-center">
             <div className="flex items-center justify-center gap-2 text-primary font-bold text-sm uppercase tracking-widest mb-2">
               <Sparkles className="w-4 h-4" />
-              <span>Phase One: Initialization</span>
+              <span>Let's Get You Set Up</span>
             </div>
-            <h1 className="text-4xl font-black tracking-tight text-white/90">Select Your Mission</h1>
+            <h1 className="text-4xl font-black tracking-tight text-white/90">What Do You Want to Grow?</h1>
             <p className="text-muted-foreground font-medium max-w-2xl mx-auto">
-              Choose the service you're onboarding for. We'll collect the specific intelligence needed to deploy your campaign.
+              Pick what you need help with. We'll ask a few quick questions to get you started.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
             {[
-              { id: "real-estate", title: "Real Estate Outreach", icon: Target, desc: "Targeted outreach for real estate professionals." },
-              { id: "general", title: "General Outreach", icon: Instagram, desc: "Standard account growth and networking." },
-              { id: "mass-dm", title: "Mass DM Blast", icon: MessageSquare, desc: "High-volume DM campaigns for maximum exposure." },
-              { id: "website", title: "Website Project", icon: Globe, desc: "Custom web development and landing pages." },
-              { id: "content", title: "Content Creation", icon: ListTodo, desc: "Professional design and social media content." },
+              { id: "real-estate", title: "Get Real Estate Clients", icon: Target, desc: "Find buyers, sellers, and investors who actually want to talk." },
+              { id: "general", title: "Get More Customers (Instagram)", icon: Instagram, desc: "Grow your following and book more sales calls." },
+              { id: "mass-dm", title: "Reach Thousands at Once", icon: MessageSquare, desc: "Send DMs to a huge target list — fast." },
+              { id: "website", title: "Build Me a Website", icon: Globe, desc: "Custom site that actually converts visitors." },
+              { id: "content", title: "Design My Posts", icon: ListTodo, desc: "On-brand content ready to post." },
             ].map((service) => (
               <motion.div
                 key={service.id}
@@ -706,11 +706,11 @@ export default function OnboardingPage() {
                 className="h-12 px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-lg amber-glow"
               >
                 {isLoading ? (
-                  "Deploying..."
+                  "Submitting..."
                 ) : currentStep === steps.length - 1 ? (
-                  <span className="flex items-center gap-2">Finalize & Launch <ArrowRight className="h-4 w-4" /></span>
+                  <span className="flex items-center gap-2">Submit & Start <ArrowRight className="h-4 w-4" /></span>
                 ) : (
-                  <span className="flex items-center gap-2">Next Step <ArrowRight className="h-4 w-4" /></span>
+                  <span className="flex items-center gap-2">Next <ArrowRight className="h-4 w-4" /></span>
                 )}
               </Button>
             </div>

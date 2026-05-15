@@ -15,6 +15,10 @@ import {
   type VapiConfig,
 } from "@/lib/vapiClient";
 import { upsertVapiCallLog } from "@/lib/voiceCallerConvex";
+import {
+  releaseVapiSlot,
+  reserveVapiSlot,
+} from "@/lib/vapiConcurrency";
 import type { CampaignLead } from "@/types/voiceCaller";
 
 export type VapiLaunchInput = {
@@ -57,6 +61,18 @@ export async function launchVapiCampaign(
 
   const results: VapiLaunchResult[] = [];
   for (const lead of input.leads) {
+    // Org-wide concurrency precheck. Vapi caps concurrent calls; without
+    // this we'd burn a campaign creation only for Vapi to 429 us mid-loop.
+    const slot = await reserveVapiSlot();
+    if (!slot.allowed) {
+      results.push({
+        phone: lead.phone,
+        name: lead.name,
+        ok: false,
+        error: `Concurrent call limit reached (${slot.limit}). Wait for in-flight calls to finish.`,
+      });
+      continue;
+    }
     try {
       const call = await createVapiCall(config, {
         lead,
@@ -89,6 +105,8 @@ export async function launchVapiCampaign(
 
       results.push({ phone: lead.phone, name: lead.name, ok: true, vapiCallId: call.id });
     } catch (error) {
+      // Failed launch — release the slot we reserved.
+      await releaseVapiSlot();
       results.push({
         phone: lead.phone,
         name: lead.name,

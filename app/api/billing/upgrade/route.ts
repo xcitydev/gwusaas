@@ -73,6 +73,20 @@ export async function POST(req: Request) {
       console.error("Convex plan sync failed (non-fatal):", convexErr);
     }
 
+    // 3. If this user was referred, record the commission for the referrer.
+    // Non-fatal — we never want a referral failure to block the upgrade.
+    try {
+      const upgradeEventId =
+        verificationToken ?? `${userId}:${plan}:${Date.now()}`;
+      await convex.mutation("referrals:recordCommission" as never, {
+        referredClerkUserId: userId,
+        plan,
+        upgradeEventId,
+      } as never);
+    } catch (referralErr) {
+      console.error("Referral commission recording failed (non-fatal):", referralErr);
+    }
+
     return NextResponse.json({
       success: true,
       plan,

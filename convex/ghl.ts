@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { encrypt, decrypt } from "./lib/encryption";
 
 /**
  * Inserts or updates a cached GHL contact using ghlContactId as the unique key.
@@ -88,12 +89,15 @@ export const getOutreachLog = query({
 
 /**
  * Saves a GHL location connection for a Clerk user.
+ * Stores the API key encrypted at rest.
  */
 export const saveGHLConnection = mutation({
   args: {
     clerkUserId: v.string(),
     locationId: v.string(),
     locationName: v.string(),
+    apiKey: v.optional(v.string()),
+    signupSource: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -114,11 +118,15 @@ export const saveGHLConnection = mutation({
       );
     }
 
+    const encryptedApiKey = args.apiKey ? await encrypt(args.apiKey) : undefined;
+
     return ctx.db.insert("ghlConnections", {
       clerkUserId: args.clerkUserId,
       locationId: args.locationId,
       locationName: args.locationName,
       isActive,
+      encryptedApiKey,
+      signupSource: args.signupSource,
       createdAt: Date.now(),
     });
   },
@@ -126,6 +134,9 @@ export const saveGHLConnection = mutation({
 
 /**
  * Gets the active GHL connection for a Clerk user.
+ * NOTE: Returns the row including encryptedApiKey. Do not expose this directly to
+ * client UIs — use getMyGHLConnectionPublic for client-safe data, or
+ * getDecryptedGHLApiKey from server-only contexts that need to call GHL.
  */
 export const getGHLConnection = query({
   args: { clerkUserId: v.string() },
@@ -136,5 +147,80 @@ export const getGHLConnection = query({
         q.eq("clerkUserId", args.clerkUserId).eq("isActive", true),
       )
       .first();
+  },
+});
+
+/**
+ * Client-safe view of the active GHL connection (omits the encrypted API key).
+ */
+export const getMyGHLConnectionPublic = query({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("ghlConnections")
+      .withIndex("by_clerk_user_id_active", (q) =>
+        q.eq("clerkUserId", args.clerkUserId).eq("isActive", true),
+      )
+      .first();
+
+    if (!row) return null;
+
+    return {
+      _id: row._id,
+      locationId: row.locationId,
+      locationName: row.locationName,
+      isActive: row.isActive,
+      signupSource: row.signupSource,
+      createdAt: row.createdAt,
+      hasApiKey: Boolean(row.encryptedApiKey),
+    };
+  },
+});
+
+/**
+ * Decrypts and returns the GHL API key for a user's active connection.
+ * Server-only — call from API routes that need to talk to GHL on the user's behalf.
+ */
+export const getDecryptedGHLApiKey = query({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("ghlConnections")
+      .withIndex("by_clerk_user_id_active", (q) =>
+        q.eq("clerkUserId", args.clerkUserId).eq("isActive", true),
+      )
+      .first();
+
+    if (!row || !row.encryptedApiKey) return null;
+
+    const apiKey = await decrypt(row.encryptedApiKey);
+    return {
+      apiKey,
+      locationId: row.locationId,
+      locationName: row.locationName,
+    };
+  },
+});
+
+/**
+ * Disconnects (deactivates) all active GHL connections for a Clerk user.
+ */
+export const disconnectGHL = mutation({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const activeConnections = await ctx.db
+      .query("ghlConnections")
+      .withIndex("by_clerk_user_id_active", (q) =>
+        q.eq("clerkUserId", args.clerkUserId).eq("isActive", true),
+      )
+      .collect();
+
+    await Promise.all(
+      activeConnections.map((connection) =>
+        ctx.db.patch(connection._id, { isActive: false }),
+      ),
+    );
+
+    return { disconnected: activeConnections.length };
   },
 });

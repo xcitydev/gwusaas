@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { isFreshWebhookEvent } from "@/lib/webhookIdempotency";
 
 type WebhookPayload = {
   type?: string;
@@ -39,6 +40,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const eventType = payload.type ?? payload.eventType ?? "Unknown";
+
+    // Idempotency: GHL retries on timeout, dedupe by event id (or fall back
+    // to a hash of the body if the event has no stable id field).
+    const eventId =
+      typeof payload.id === "string"
+        ? payload.id
+        : typeof payload.eventId === "string"
+          ? payload.eventId
+          : crypto.createHash("sha256").update(rawPayload).digest("hex");
+    const fresh = await isFreshWebhookEvent("ghl", `${eventType}:${eventId}`);
+    if (!fresh) {
+      return NextResponse.json({ success: true, deduped: true });
+    }
 
     switch (eventType) {
       case "ContactCreated":

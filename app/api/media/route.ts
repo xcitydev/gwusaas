@@ -3,7 +3,7 @@ import { requirePlan } from "@/lib/route-auth";
 import { listMediaGenerations, toMediaItem } from "@/lib/convex-media";
 
 export async function GET(req: Request) {
-  const guard = await requirePlan("growth");
+  const guard = await requirePlan("growth", { rateLimit: "ghl", requireAi: false });
   if (!guard.ok) return guard.response;
 
   const { searchParams } = new URL(req.url);

@@ -5,7 +5,7 @@ import { startVideoGeneration } from "@/lib/providers/generate-video";
 import { createMediaGeneration, toMediaItem, getUserApiKeys } from "@/lib/convex-media";
 
 export async function POST(req: Request) {
-  const guard = await requirePlan("growth");
+  const guard = await requirePlan("growth", { rateLimit: "media" });
   if (!guard.ok) return guard.response;
 
   try {

@@ -109,7 +109,7 @@ async function launchLivePlayback(
 }
 
 export async function POST(req: Request) {
-  const guard = await requireVoiceCallerAccess();
+  const guard = await requireVoiceCallerAccess({ rateLimit: "voice" });
   if (!guard.ok) return guard.response;
 
   let body: z.infer<typeof bodySchema>;

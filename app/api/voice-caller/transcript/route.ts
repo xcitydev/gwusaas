@@ -18,7 +18,7 @@ export const runtime = "nodejs";
  *                 is in progress.
  */
 export async function GET(req: Request) {
-  const guard = await requireVoiceCallerAccess();
+  const guard = await requireVoiceCallerAccess({ rateLimit: "ghl" });
   if (!guard.ok) return guard.response;
 
   const url = new URL(req.url);

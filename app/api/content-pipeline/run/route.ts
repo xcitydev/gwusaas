@@ -223,7 +223,7 @@ async function runPipelineInBackground({
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePlan("growth");
+    const guard = await requirePlan("growth", { rateLimit: "ai" });
     if (!guard.ok) {
       return guard.response;
     }

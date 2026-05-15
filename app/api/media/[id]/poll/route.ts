@@ -4,7 +4,7 @@ import { pollVideoJob } from "@/lib/providers/generate-video";
 import { getMediaGeneration, updateMediaGeneration, toMediaItem, getUserApiKeys } from "@/lib/convex-media";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requirePlan("growth");
+  const guard = await requirePlan("growth", { rateLimit: "ghl", requireAi: false });
   if (!guard.ok) return guard.response;
 
   const { id } = await params;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import crypto from "crypto";
+import { isFreshWebhookEvent } from "@/lib/webhookIdempotency";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -31,6 +32,17 @@ export async function POST(req: NextRequest) {
 
     const body = JSON.parse(rawBody);
     const { clerkUserId, clientId, sourceAccount, results } = body;
+
+    // Idempotency: Apify retries on 5xx and timeout. runId is the natural
+    // dedupe key; fall back to body hash if missing.
+    const eventId =
+      typeof body.runId === "string"
+        ? body.runId
+        : crypto.createHash("sha256").update(rawBody).digest("hex");
+    const fresh = await isFreshWebhookEvent("apify", eventId);
+    if (!fresh) {
+      return NextResponse.json({ success: true, deduped: true });
+    }
 
     if (!clerkUserId || !clientId || !results || !Array.isArray(results)) {
       return NextResponse.json(

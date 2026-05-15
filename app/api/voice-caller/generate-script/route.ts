@@ -18,7 +18,7 @@ const SYSTEM_PROMPT =
 const FALLBACK_MODELS = ["claude-3-5-sonnet-latest", "claude-sonnet-4-20250514"];
 
 export async function POST(req: Request) {
-  const guard = await requireVoiceCallerAccess();
+  const guard = await requireVoiceCallerAccess({ rateLimit: "ai" });
   if (!guard.ok) return guard.response;
 
   if (!process.env.ANTHROPIC_API_KEY) {

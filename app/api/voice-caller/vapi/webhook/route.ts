@@ -4,6 +4,8 @@ import {
   upsertVapiCallLog,
 } from "@/lib/voiceCallerConvex";
 import { verifyVapiWebhook } from "@/lib/vapiClient";
+import { isFreshWebhookEvent } from "@/lib/webhookIdempotency";
+import { releaseVapiSlot } from "@/lib/vapiConcurrency";
 import type {
   CallOutcome,
   QualSignals,
@@ -179,6 +181,20 @@ export async function POST(req: Request) {
   const vapiCallId = message.call?.id;
   if (!vapiCallId) return NextResponse.json({ ok: true });
 
+  // Idempotency: dedupe per (callId, messageType). Vapi retries on timeout
+  // and we'd otherwise double-write transcript lines and call logs.
+  // Status-update events fire many times per call legitimately, so we don't
+  // dedupe those — only the terminal end-of-call-report.
+  if (message.type === "end-of-call-report" || message.type === "transcript") {
+    const dedupeKey = `${vapiCallId}:${message.type}:${
+      message.transcript?.slice(0, 50) ?? ""
+    }`;
+    const fresh = await isFreshWebhookEvent("vapi", dedupeKey);
+    if (!fresh) {
+      return NextResponse.json({ ok: true, deduped: true });
+    }
+  }
+
   const meta = readMetadata(message);
 
   // We need at least the campaign + client + phone to write a log.
@@ -254,6 +270,9 @@ export async function POST(req: Request) {
     }
 
     case "end-of-call-report": {
+      // Release the concurrency slot we reserved on launch — even if log
+      // upsert fails below, we always want the slot freed.
+      await releaseVapiSlot();
       const built = buildTranscriptLines(message);
       const transcript = built.length > 0 ? built : existing?.transcript ?? [];
       const fullText =

@@ -42,6 +42,7 @@ import type {
 } from "@/types/voiceCaller";
 import { LiveCallMonitor } from "./LiveCallMonitor";
 import { PostCallReport } from "./PostCallReport";
+import { VapiWebTest } from "./VapiWebTest";
 
 type CallType = "live" | "voicemail";
 
@@ -376,7 +377,7 @@ export function VoiceCallerDashboard() {
       </div>
 
       <Tabs defaultValue="clone" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="clone">
             <Mic className="mr-2 h-4 w-4" /> Clone Voice
           </TabsTrigger>
@@ -385,6 +386,9 @@ export function VoiceCallerDashboard() {
           </TabsTrigger>
           <TabsTrigger value="launch">
             <Rocket className="mr-2 h-4 w-4" /> Launch & Track
+          </TabsTrigger>
+          <TabsTrigger value="vapi-test">
+            <Cloud className="mr-2 h-4 w-4" /> Test in Browser
           </TabsTrigger>
         </TabsList>
 
@@ -833,6 +837,11 @@ export function VoiceCallerDashboard() {
               onClose={() => setSelectedLogId(null)}
             />
           )}
+        </TabsContent>
+
+        {/* ─────────── TAB 4 — Browser Vapi test ─────────── */}
+        <TabsContent value="vapi-test" className="space-y-4">
+          <VapiWebTest voiceClone={voiceClone} campaigns={campaigns} />
         </TabsContent>
       </Tabs>
 

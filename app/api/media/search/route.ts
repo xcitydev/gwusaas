@@ -4,7 +4,7 @@ import { searchImages } from "@/lib/apify-images";
 import { getUserApiKeys } from "@/lib/convex-media";
 
 export async function POST(req: Request) {
-  const guard = await requirePlan("growth");
+  const guard = await requirePlan("growth", { rateLimit: "media", requireAi: false });
   if (!guard.ok) return guard.response;
 
   try {

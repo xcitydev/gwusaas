@@ -24,7 +24,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const guard = await requireVoiceCallerAccess();
+  const guard = await requireVoiceCallerAccess({ rateLimit: "ghl" });
   if (!guard.ok) return guard.response;
 
   let body: z.infer<typeof bodySchema>;
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  const guard = await requireVoiceCallerAccess();
+  const guard = await requireVoiceCallerAccess({ rateLimit: "ghl" });
   if (!guard.ok) return guard.response;
 
   try {

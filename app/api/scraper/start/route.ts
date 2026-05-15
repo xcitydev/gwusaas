@@ -111,7 +111,11 @@ async function qualifyFollowers(
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePlan("growth");
+    const guard = await requirePlan("growth", {
+      rateLimit: "scrape",
+      requireAi: false,
+      consumeUsage: "dailyLeadScrapes",
+    });
     if (!guard.ok) return guard.response;
     if (!convex) {
       return NextResponse.json(

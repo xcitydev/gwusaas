@@ -176,8 +176,9 @@ const getAiSearchOptimization = async (
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     const completion = await client.chat.completions.create({
-      model: "gpt-5.3",
+      model: "gpt-4o",
       temperature: 0.7,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: buildUserPrompt(input) },
