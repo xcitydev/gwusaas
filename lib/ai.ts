@@ -88,6 +88,52 @@ function stripCodeFences(rawText: string): string {
     .trim();
 }
 
+// Salvage a JSON array that was cut off mid-element by the model hitting a
+// token limit. Walks the text tracking depth + string state and returns the
+// slice up to the last fully-closed top-level element, then appends `]`.
+function salvageTruncatedArray(text: string): unknown | null {
+  const start = text.indexOf("[");
+  if (start === -1) return null;
+  let depth = 1;
+  let inString = false;
+  let escape = false;
+  let lastCompleteEnd = -1;
+
+  for (let i = start + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{" || ch === "[") {
+      depth++;
+    } else if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 1 && ch === "}") lastCompleteEnd = i;
+      if (depth === 0) return null; // not truncated, normal parse should handle
+    }
+  }
+  if (lastCompleteEnd === -1) return [];
+  const candidate = text.slice(start, lastCompleteEnd + 1) + "]";
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
+}
+
 function parseJsonFromText<T>(rawText: string): T {
   const sanitized = stripCodeFences(rawText);
   try {
@@ -101,23 +147,29 @@ function parseJsonFromText<T>(rawText: string): T {
     const hasCurly = firstCurly !== -1 && lastCurly > firstCurly;
     const hasBracket = firstBracket !== -1 && lastBracket > firstBracket;
 
-    if (hasCurly && hasBracket) {
-      if (firstBracket < firstCurly) {
-        // Outer structure is an array
-        const candidate = sanitized.slice(firstBracket, lastBracket + 1);
-        return JSON.parse(candidate) as T;
-      } else {
-        // Outer structure is an object
-        const candidate = sanitized.slice(firstCurly, lastCurly + 1);
-        return JSON.parse(candidate) as T;
+    try {
+      if (hasCurly && hasBracket) {
+        if (firstBracket < firstCurly) {
+          return JSON.parse(sanitized.slice(firstBracket, lastBracket + 1)) as T;
+        }
+        return JSON.parse(sanitized.slice(firstCurly, lastCurly + 1)) as T;
+      } else if (hasCurly) {
+        return JSON.parse(sanitized.slice(firstCurly, lastCurly + 1)) as T;
+      } else if (hasBracket) {
+        return JSON.parse(sanitized.slice(firstBracket, lastBracket + 1)) as T;
       }
-    } else if (hasCurly) {
-      const candidate = sanitized.slice(firstCurly, lastCurly + 1);
-      return JSON.parse(candidate) as T;
-    } else if (hasBracket) {
-      const candidate = sanitized.slice(firstBracket, lastBracket + 1);
-      return JSON.parse(candidate) as T;
+    } catch {
+      // fall through to salvage
     }
+
+    const salvaged = salvageTruncatedArray(sanitized);
+    if (salvaged !== null) {
+      console.warn("[AI] JSON parse failed, salvaged truncated array", {
+        salvagedCount: Array.isArray(salvaged) ? salvaged.length : "n/a",
+      });
+      return salvaged as T;
+    }
+
     throw new Error("Model response did not contain parseable JSON: " + (err instanceof Error ? err.message : String(err)));
   }
 }

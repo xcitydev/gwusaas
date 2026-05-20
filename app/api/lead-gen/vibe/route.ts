@@ -58,6 +58,8 @@ export async function POST(req: Request) {
     const locationLine = location ? `Preferred location: ${location}\n` : "";
 
     const traceId = `lead-gen-vibe:${guard.userId}:${Date.now()}`;
+    // Each lead carries ~12 fields. Budget ~350 tokens per lead to avoid mid-array truncation.
+    const maxTokens = Math.min(16000, 800 + limit * 350);
     const { data, provider, model, rawText } = await generateJsonWithFallback<unknown[]>({
       system: systemPrompt.replace("{MAX}", String(limit)),
       messages: [
@@ -67,10 +69,11 @@ export async function POST(req: Request) {
             `Search query: "${query}"\n` +
             filterLine +
             locationLine +
-            `Return up to ${limit} high-quality B2B prospects as JSON array only.`,
+            `Return up to ${limit} high-quality B2B prospects.`,
         },
       ],
       traceId,
+      maxTokens,
     });
 
     function unwrapArray(value: unknown): unknown[] {
