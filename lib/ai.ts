@@ -87,70 +87,145 @@ function stripCodeFences(rawText: string): string {
     .trim();
 }
 
-/**
- * Scan for the first balanced JSON object or array starting at the first
- * `{` or `[`. Handles strings with escaped quotes so braces inside string
- * values don't confuse the depth counter.
- */
-function extractBalancedJson(text: string): string | null {
-  let start = -1;
-  let openChar: "{" | "[" | null = null;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === "{" || c === "[") {
-      start = i;
-      openChar = c;
-      break;
-    }
-  }
-  if (start === -1 || !openChar) return null;
-  const closeChar = openChar === "{" ? "}" : "]";
-
-  let depth = 0;
+// Salvage a JSON array that was cut off mid-element by the model hitting a
+// token limit. Walks the text tracking depth + string state and returns the
+// slice up to the last fully-closed top-level element, then appends `]`.
+function salvageTruncatedArray(text: string): unknown | null {
+  const start = text.indexOf("[");
+  if (start === -1) return null;
+  let depth = 1;
   let inString = false;
   let escape = false;
-  for (let i = start; i < text.length; i++) {
-    const c = text[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
+  let lastCompleteEnd = -1;
+
+  for (let i = start + 1; i < text.length; i++) {
+    const ch = text[i];
     if (inString) {
-      if (c === "\\") escape = true;
-      else if (c === '"') inString = false;
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') inString = false;
       continue;
     }
-    if (c === '"') {
+    if (ch === '"') {
       inString = true;
       continue;
     }
-    if (c === openChar) depth++;
-    else if (c === closeChar) {
+    if (ch === "{" || ch === "[") {
+      depth++;
+    } else if (ch === "}" || ch === "]") {
       depth--;
-      if (depth === 0) return text.slice(start, i + 1);
+      if (depth === 1 && ch === "}") lastCompleteEnd = i;
+      if (depth === 0) return null; // not truncated, normal parse should handle
     }
   }
-  return null;
+  if (lastCompleteEnd === -1) return [];
+  const candidate = text.slice(start, lastCompleteEnd + 1) + "]";
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
+}
+
+function extractBalancedJson(text: string): string | null {
+  function candidates(startChar: "{" | "["): string[] {
+    const endChar = startChar === "{" ? "}" : "]";
+    const result: string[] = [];
+    for (let start = text.indexOf(startChar); start !== -1; start = text.indexOf(startChar, start + 1)) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      for (let i = start; i < text.length; i++) {
+        const char = text[i];
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          if (char === "\\") {
+            escaped = true;
+            continue;
+          }
+          if (char === '"') inString = false;
+          continue;
+        }
+        if (char === '"') {
+          inString = true;
+          continue;
+        }
+        if (char === startChar) {
+          depth++;
+          continue;
+        }
+        if (char === endChar) {
+          depth--;
+          if (depth === 0) {
+            result.push(text.slice(start, i + 1));
+            break;
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  const all = [...candidates("["), ...candidates("{")].sort((a, b) => b.length - a.length);
+  return all[0] ?? null;
 }
 
 function parseJsonFromText<T>(rawText: string): T {
   const sanitized = stripCodeFences(rawText);
   try {
     return JSON.parse(sanitized) as T;
-  } catch {
-    // fall through to balanced-extraction attempt below
-  }
+  } catch (err) {
+    const firstCurly = sanitized.indexOf("{");
+    const lastCurly = sanitized.lastIndexOf("}");
+    const firstBracket = sanitized.indexOf("[");
+    const lastBracket = sanitized.lastIndexOf("]");
 
-  const balanced = extractBalancedJson(sanitized);
-  if (balanced) {
+    const hasCurly = firstCurly !== -1 && lastCurly > firstCurly;
+    const hasBracket = firstBracket !== -1 && lastBracket > firstBracket;
+
     try {
-      return JSON.parse(balanced) as T;
+      if (hasCurly && hasBracket) {
+        if (firstBracket < firstCurly) {
+          return JSON.parse(sanitized.slice(firstBracket, lastBracket + 1)) as T;
+        }
+        return JSON.parse(sanitized.slice(firstCurly, lastCurly + 1)) as T;
+      } else if (hasCurly) {
+        return JSON.parse(sanitized.slice(firstCurly, lastCurly + 1)) as T;
+      } else if (hasBracket) {
+        return JSON.parse(sanitized.slice(firstBracket, lastBracket + 1)) as T;
+      }
     } catch {
-      // fall through
+      // fall through to salvage
     }
-  }
 
-  throw new Error("Model response did not contain parseable JSON");
+    const balanced = extractBalancedJson(sanitized);
+    if (balanced) {
+      try {
+        return JSON.parse(balanced) as T;
+      } catch {
+        // fall through
+      }
+    }
+
+    const salvaged = salvageTruncatedArray(sanitized);
+    if (salvaged !== null) {
+      console.warn("[AI] JSON parse failed, salvaged truncated array", {
+        salvagedCount: Array.isArray(salvaged) ? salvaged.length : "n/a",
+      });
+      return salvaged as T;
+    }
+
+    throw new Error("Model response did not contain parseable JSON: " + (err instanceof Error ? err.message : String(err)));
+  }
 }
 
 function isModelNotFoundError(error: unknown): boolean {

@@ -13,10 +13,10 @@ const bodySchema = z.object({
 });
 
 const systemPrompt =
-  "You are the Vibe Prospecting B2B database. Return ONLY a JSON array of up to {MAX} realistic prospect objects drawn from known US/CA company directories, LinkedIn-style public profiles, and trade associations. " +
-  "Each object must include: name (full name), email (business email, lowercase, realistic domain), phone (E.164 or (###) ###-####), company (real-sounding business name), jobTitle, industry, location (city, state), linkedin (full URL like https://linkedin.com/in/firstname-lastname-xxxx), website (company homepage), painPoint (one-sentence pain), outreachAngle (one-sentence opener), confidence (70-95). " +
+  "You are the Vibe Prospecting B2B database. Return JSON in the form {\"leads\": [...]} containing up to {MAX} realistic prospect objects drawn from known US/CA company directories, LinkedIn-style public profiles, and trade associations. " +
+  "Each lead object must include: name (full name), email (business email, lowercase, realistic domain), phone (E.164 or (###) ###-####), company (real-sounding business name), jobTitle, industry, location (city, state), linkedin (full URL like https://linkedin.com/in/firstname-lastname-xxxx), website (company homepage), painPoint (one-sentence pain), outreachAngle (one-sentence opener), confidence (70-95). " +
   "Do NOT fabricate emails for real named individuals — use a realistic 'firstname.lastname@domain.com' pattern with a plausible domain. Prefer variety in locations and firm sizes. " +
-  "Return valid JSON only, no prose.";
+  "Return valid JSON only, no prose. The leads array must contain at least one object.";
 
 type VibeLead = {
   name: string;
@@ -58,6 +58,8 @@ export async function POST(req: Request) {
     const locationLine = location ? `Preferred location: ${location}\n` : "";
 
     const traceId = `lead-gen-vibe:${guard.userId}:${Date.now()}`;
+    // Each lead carries ~12 fields. Budget ~350 tokens per lead to avoid mid-array truncation.
+    const maxTokens = Math.min(16000, 800 + limit * 350);
     const { data, provider, model, rawText } = await generateJsonWithFallback<unknown[]>({
       system: systemPrompt.replace("{MAX}", String(limit)),
       messages: [
@@ -67,13 +69,42 @@ export async function POST(req: Request) {
             `Search query: "${query}"\n` +
             filterLine +
             locationLine +
-            `Return up to ${limit} high-quality B2B prospects as JSON array only.`,
+            `Return up to ${limit} high-quality B2B prospects.`,
         },
       ],
       traceId,
+      maxTokens,
     });
 
-    const leads: VibeLead[] = (Array.isArray(data) ? data : []).map((item) => {
+    function unwrapArray(value: unknown): unknown[] {
+      if (Array.isArray(value)) return value;
+      if (value && typeof value === "object") {
+        const obj = value as Record<string, unknown>;
+        for (const key of [
+          "leads",
+          "prospects",
+          "results",
+          "data",
+          "items",
+          "people",
+          "contacts",
+          "matches",
+        ]) {
+          if (Array.isArray(obj[key])) return obj[key] as unknown[];
+        }
+      }
+      return [];
+    }
+
+    const rawList = unwrapArray(data);
+    if (rawList.length === 0) {
+      console.warn("Vibe returned no array — model output shape unexpected", {
+        traceId,
+        dataKeys: data && typeof data === "object" ? Object.keys(data as object) : typeof data,
+        rawPreview: rawText.slice(0, 400),
+      });
+    }
+    const leads: VibeLead[] = rawList.map((item) => {
       const row = item as Record<string, unknown>;
       return {
         name: String(row.name ?? row.contactName ?? ""),

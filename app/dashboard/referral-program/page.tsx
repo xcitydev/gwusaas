@@ -139,7 +139,7 @@ export default function ReferralProgramPage() {
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">
               Referral Program
@@ -156,6 +156,7 @@ export default function ReferralProgramPage() {
               navigator.clipboard.writeText(referralLink);
               toast.success("Referral link copied!");
             }}
+            className="w-full sm:w-auto"
           >
             <Share2 className="h-4 w-4 mr-2" />
             Share Link
@@ -340,7 +341,7 @@ export default function ReferralProgramPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-md border w-full overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

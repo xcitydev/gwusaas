@@ -83,14 +83,14 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="instagram" className="space-y-6">
-          <div className="-mx-4 sm:mx-0 overflow-x-auto">
-            <TabsList className="bg-white/5 border border-white/5 p-1 h-12 mx-4 sm:mx-0 w-max sm:w-auto">
-              <TabsTrigger value="instagram" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Instagram</TabsTrigger>
-              <TabsTrigger value="ghl" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">GoHighLevel</TabsTrigger>
-              <TabsTrigger value="voice" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Voice</TabsTrigger>
-              <TabsTrigger value="strategy" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Brand &amp; Strategy</TabsTrigger>
-              <TabsTrigger value="services" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Service Requests</TabsTrigger>
-              <TabsTrigger value="team" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Team</TabsTrigger>
+          <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+            <TabsList className="bg-white/5 border border-white/5 p-1 h-12 inline-flex w-max min-w-full justify-start">
+              <TabsTrigger value="instagram" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold shrink-0">Instagram</TabsTrigger>
+              <TabsTrigger value="ghl" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold shrink-0">GoHighLevel</TabsTrigger>
+              <TabsTrigger value="voice" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold shrink-0">Voice</TabsTrigger>
+              <TabsTrigger value="strategy" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold shrink-0">Brand & Strategy</TabsTrigger>
+              <TabsTrigger value="services" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold shrink-0">Service Requests</TabsTrigger>
+              <TabsTrigger value="team" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold shrink-0">Team</TabsTrigger>
             </TabsList>
           </div>
 
