@@ -55,7 +55,7 @@ export default function AIPage() {
   // Get projects
   const projects = useQuery(
     api.projects.list,
-    convexOrg?._id ? { organizationId: convexOrg._id } : "skip"
+    convexOrg?._id ? {} : "skip"
   );
 
   // Set first project as selected
@@ -348,21 +348,21 @@ export default function AIPage() {
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">AI Insights</h2>
             <p className="text-muted-foreground">
               Generate AI-powered insights, captions, hashtags, and more
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1 bg-primary/5 border-primary/20 text-primary">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1 bg-primary/5 border-primary/20 text-primary w-fit">
               <Sparkles className="h-3.5 w-3.5" />
               {Math.max(0, limits.dailyAiGenerations - usageCount)} / {limits.dailyAiGenerations} AI Generations left today
             </Badge>
             {projects && projects.length > 0 && (
               <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[180px] sm:w-[200px]">
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -378,17 +378,19 @@ export default function AIPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            {reportTypes.map((type) => {
-              const Icon = type.icon;
-              return (
-                <TabsTrigger key={type.id} value={type.id} className="flex items-center gap-2">
-                  <Icon className="h-4 w-4" />
-                  {type.label}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+          <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+            <TabsList className="bg-white/5 border border-white/5 p-1 h-12 inline-flex w-max min-w-full justify-start">
+              {reportTypes.map((type) => {
+                const Icon = type.icon;
+                return (
+                  <TabsTrigger key={type.id} value={type.id} className="flex items-center gap-2 px-6 shrink-0 font-bold">
+                    <Icon className="h-4 w-4" />
+                    {type.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
 
           {reportTypes.map((type) => (
             <TabsContent key={type.id} value={type.id} className="space-y-4">

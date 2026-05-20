@@ -361,7 +361,7 @@ export function VoiceCallerDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">AI Voice Qualifier</h1>
           <p className="text-muted-foreground mt-1">
@@ -370,27 +370,29 @@ export function VoiceCallerDashboard() {
           </p>
         </div>
         {voiceClone && (
-          <Badge variant="secondary" className="h-7 self-center gap-1 px-3">
+          <Badge variant="secondary" className="h-7 self-start sm:self-center gap-1 px-3 w-fit">
             <Mic className="h-3.5 w-3.5" /> {voiceClone.voiceName}
           </Badge>
         )}
       </div>
 
       <Tabs defaultValue="clone" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="clone">
-            <Mic className="mr-2 h-4 w-4" /> Clone Voice
-          </TabsTrigger>
-          <TabsTrigger value="build">
-            <AudioLines className="mr-2 h-4 w-4" /> Build Campaign
-          </TabsTrigger>
-          <TabsTrigger value="launch">
-            <Rocket className="mr-2 h-4 w-4" /> Launch & Track
-          </TabsTrigger>
-          <TabsTrigger value="vapi-test">
-            <Cloud className="mr-2 h-4 w-4" /> Test in Browser
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+          <TabsList className="bg-white/5 border border-white/5 p-1 h-12 inline-flex w-max min-w-full justify-start">
+            <TabsTrigger value="clone" className="px-6 shrink-0 font-bold">
+              <Mic className="mr-2 h-4 w-4" /> Clone Voice
+            </TabsTrigger>
+            <TabsTrigger value="build" className="px-6 shrink-0 font-bold">
+              <AudioLines className="mr-2 h-4 w-4" /> Build Campaign
+            </TabsTrigger>
+            <TabsTrigger value="launch" className="px-6 shrink-0 font-bold">
+              <Rocket className="mr-2 h-4 w-4" /> Launch & Track
+            </TabsTrigger>
+            <TabsTrigger value="vapi-test" className="px-6 shrink-0 font-bold">
+              <Cloud className="mr-2 h-4 w-4" /> Test in Browser
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ─────────── TAB 1 ─────────── */}
         <TabsContent value="clone" className="space-y-4">

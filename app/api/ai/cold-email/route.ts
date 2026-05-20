@@ -11,11 +11,14 @@ const bodySchema = z.object({
 });
 
 const systemPrompt =
-  "You are a cold outreach copywriter. Generate a cold email sequence with exactly 3 emails: initial, followUp, breakup. Return valid JSON with subject and body for each email.";
+  "You are a cold outreach copywriter. Generate a cold email sequence with exactly 3 emails: initial, followUp, breakup. " +
+  "For each email return: subject (the primary subject line), subjectVariants (array of exactly 3 distinct A/B subject lines including the primary), and body. " +
+  "Return valid JSON only.";
 
 const emailMessageSchema = z.object({
   subject: z.string().min(1),
   body: z.string().min(1),
+  subjectVariants: z.array(z.string()).optional(),
 });
 
 const emailSequenceSchema = z.object({
@@ -55,7 +58,17 @@ function toEmailMessage(value: unknown, fallbackLabel: string) {
 
   if (!body) return null;
 
-  return { subject, body };
+  const rawVariants =
+    obj.subjectVariants ?? obj.subject_variants ?? obj.variants ?? obj.subjects;
+  const variants = Array.isArray(rawVariants)
+    ? rawVariants
+        .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+        .map((v) => v.trim())
+    : [];
+  const dedup = Array.from(new Set([subject, ...variants])).slice(0, 3);
+  while (dedup.length < 3) dedup.push(`${subject} (alt ${dedup.length})`);
+
+  return { subject, body, subjectVariants: dedup };
 }
 
 function createTemplateSequence(input: {
@@ -70,9 +83,17 @@ function createTemplateSequence(input: {
         ? "Quick one for you,"
         : "Hi there,";
 
+  const initSubj = `${input.offer} for ${input.targetIndustry}`;
+  const fuSubj = `Following up: ${input.offer}`;
+  const bkSubj = "Should I close your file?";
   return {
     initial: {
-      subject: `${input.offer} for ${input.targetIndustry}`,
+      subject: initSubj,
+      subjectVariants: [
+        initSubj,
+        `Quick question about ${input.targetIndustry}`,
+        `${input.offer} — worth a look?`,
+      ],
       body:
         `${opener}\n\n` +
         `We help ${input.targetIndustry} get more qualified opportunities with our ${input.offer}.\n` +
@@ -80,14 +101,16 @@ function createTemplateSequence(input: {
         "Best,\nGWU Agency",
     },
     followUp: {
-      subject: `Following up: ${input.offer}`,
+      subject: fuSubj,
+      subjectVariants: [fuSubj, "Re: " + input.offer, "Bumping this to the top"],
       body:
         "Just following up in case this got buried.\n\n" +
         `If improving outbound results in ${input.targetIndustry} is a priority, I can share a short breakdown of how we deploy this.\n\n` +
         "Open to a quick call?",
     },
     breakup: {
-      subject: "Should I close your file?",
+      subject: bkSubj,
+      subjectVariants: [bkSubj, "Closing your file?", "Last note from me"],
       body:
         "No worries if timing is not right.\n\n" +
         "If you want, I can circle back in a few weeks. Otherwise I will close this out for now.\n\n" +

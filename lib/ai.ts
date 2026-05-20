@@ -92,20 +92,33 @@ function parseJsonFromText<T>(rawText: string): T {
   const sanitized = stripCodeFences(rawText);
   try {
     return JSON.parse(sanitized) as T;
-  } catch {
+  } catch (err) {
     const firstCurly = sanitized.indexOf("{");
     const lastCurly = sanitized.lastIndexOf("}");
-    if (firstCurly !== -1 && lastCurly > firstCurly) {
-      const candidate = sanitized.slice(firstCurly, lastCurly + 1);
-      return JSON.parse(candidate) as T;
-    }
     const firstBracket = sanitized.indexOf("[");
     const lastBracket = sanitized.lastIndexOf("]");
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
+
+    const hasCurly = firstCurly !== -1 && lastCurly > firstCurly;
+    const hasBracket = firstBracket !== -1 && lastBracket > firstBracket;
+
+    if (hasCurly && hasBracket) {
+      if (firstBracket < firstCurly) {
+        // Outer structure is an array
+        const candidate = sanitized.slice(firstBracket, lastBracket + 1);
+        return JSON.parse(candidate) as T;
+      } else {
+        // Outer structure is an object
+        const candidate = sanitized.slice(firstCurly, lastCurly + 1);
+        return JSON.parse(candidate) as T;
+      }
+    } else if (hasCurly) {
+      const candidate = sanitized.slice(firstCurly, lastCurly + 1);
+      return JSON.parse(candidate) as T;
+    } else if (hasBracket) {
       const candidate = sanitized.slice(firstBracket, lastBracket + 1);
       return JSON.parse(candidate) as T;
     }
-    throw new Error("Model response did not contain parseable JSON");
+    throw new Error("Model response did not contain parseable JSON: " + (err instanceof Error ? err.message : String(err)));
   }
 }
 

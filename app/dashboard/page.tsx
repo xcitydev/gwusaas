@@ -104,7 +104,7 @@ export default function DashboardPage() {
               <span>Workspace Overview</span>
             </div>
             <h1 className="text-4xl font-black tracking-tight text-white/90">
-              Commander Dashboard
+               Dashboard
             </h1>
             <p className="text-muted-foreground font-medium">
               Ready for takeoff. All systems operational.
@@ -132,7 +132,7 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* Plan/Stats - Smaller Span */}
-          <motion.div variants={item} className="md:col-span-4">
+          {/* <motion.div variants={item} className="md:col-span-4">
             <div className="glass-card rounded-[2rem] p-8 h-full flex flex-col justify-between bg-gradient-to-br from-primary/5 to-transparent">
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
@@ -161,7 +161,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
-          </motion.div>
+          </motion.div> */}
 
           {/* Categories Grid - Mid Span */}
           <motion.div variants={item} className="md:col-span-12">

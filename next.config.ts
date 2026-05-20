@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 /**
  * Security headers applied to every response. Tuned for the third-party
@@ -116,6 +117,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

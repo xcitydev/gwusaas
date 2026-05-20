@@ -837,4 +837,68 @@ export default defineSchema({
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
+
+  // ============================================================
+  // Email & SMS Hub — saved templates, multi-channel sequences,
+  // performance analytics. Per-user/per-client scoped.
+  // ============================================================
+
+  outreachTemplates: defineTable({
+    clerkUserId: v.string(),
+    clientId: v.optional(v.string()),
+    channel: v.string(), // "email" | "sms"
+    name: v.string(),
+    tags: v.array(v.string()),
+    // For email: array of { subject, body } steps. For SMS: array of { body } steps.
+    steps: v.any(),
+    sourceInput: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_channel", ["clerkUserId", "channel"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
+
+  outreachSequences: defineTable({
+    clerkUserId: v.string(),
+    clientId: v.optional(v.string()),
+    name: v.string(),
+    // Array of { channel: "email"|"sms", delayDays, subject?, body }
+    steps: v.any(),
+    status: v.string(), // "draft" | "active" | "paused"
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
+
+  outreachTemplateMetrics: defineTable({
+    clerkUserId: v.string(),
+    templateId: v.id("outreachTemplates"),
+    sent: v.number(),
+    opened: v.number(),
+    replied: v.number(),
+    booked: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_template_id", ["templateId"])
+    .index("by_clerk_user_id", ["clerkUserId"]),
+
+  outreachSends: defineTable({
+    clerkUserId: v.string(),
+    templateId: v.optional(v.id("outreachTemplates")),
+    channel: v.string(), // "email" | "sms"
+    provider: v.string(), // "resend" | "twilio"
+    providerId: v.string(), // resend message id / twilio sid
+    to: v.string(),
+    subject: v.optional(v.string()),
+    status: v.string(), // queued | sent | delivered | opened | clicked | bounced | failed | replied
+    sentAt: v.number(),
+    updatedAt: v.number(),
+    lastEvent: v.optional(v.string()),
+    error: v.optional(v.string()),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_provider_id", ["provider", "providerId"])
+    .index("by_template_id", ["templateId"]),
 });

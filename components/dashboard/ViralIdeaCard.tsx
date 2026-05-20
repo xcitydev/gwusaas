@@ -1,4 +1,4 @@
-import { Bookmark, Sparkles, Send, Lightbulb } from "lucide-react";
+import { Bookmark, Sparkles, Send, Lightbulb, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -15,9 +15,10 @@ type Props = {
   locked?: boolean;
   onSave: () => void;
   onAddToPipeline: () => void;
+  onExpand?: () => void;
 };
 
-export function ViralIdeaCard({ item, locked, onSave, onAddToPipeline }: Props) {
+export function ViralIdeaCard({ item, locked, onSave, onAddToPipeline, onExpand }: Props) {
   return (
     <div className={`group rounded-2xl border border-white/5 bg-white/5 p-5 space-y-4 relative transition-all duration-300 hover:border-primary/20 hover:bg-white/10 ${locked ? "opacity-55 blur-[1px]" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -41,12 +42,18 @@ export function ViralIdeaCard({ item, locked, onSave, onAddToPipeline }: Props) 
       <div className="pt-2 flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={onSave} disabled={Boolean(locked)} className="h-8 text-[11px] font-bold rounded-lg border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
           <Bookmark className="mr-1.5 h-3.5 w-3.5" />
-          Save Idea
+          Save
         </Button>
-        <Button size="sm" onClick={onAddToPipeline} disabled={Boolean(locked)} className="h-8 text-[11px] font-bold rounded-lg amber-glow">
+        <Button size="sm" variant="outline" onClick={onAddToPipeline} disabled={Boolean(locked)} className="h-8 text-[11px] font-bold rounded-lg border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
           <Send className="mr-1.5 h-3.5 w-3.5" />
           Pipeline
         </Button>
+        {onExpand && (
+          <Button size="sm" onClick={onExpand} disabled={Boolean(locked)} className="h-8 text-[11px] font-bold rounded-lg amber-glow">
+            <Zap className="mr-1.5 h-3.5 w-3.5" />
+            Draft It
+          </Button>
+        )}
       </div>
     </div>
   );

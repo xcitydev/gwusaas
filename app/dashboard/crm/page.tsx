@@ -162,26 +162,26 @@ export default function CRMPage() {
   return (
     <SideBar>
       <div className="flex-1 space-y-4 p-8 pt-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">CRM - GHL Contacts</h2>
             <p className="text-muted-foreground">
               Manage leads pulled from your GoHighLevel account.
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={exportCsv}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportCsv} className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => void fetchContacts()} disabled={isLoading}>
+            <Button size="sm" onClick={() => void fetchContacts()} disabled={isLoading} className="w-full sm:w-auto">
               <RefreshCcw className="h-4 w-4 mr-2" />
               {isLoading ? "Loading..." : "Refresh from GHL"}
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
@@ -233,30 +233,32 @@ export default function CRMPage() {
             ) : null}
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-2 mb-4">
-              <Input
-                placeholder="Optional locationId override"
-                className="max-w-[260px]"
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-              />
-              <Input
-                placeholder="Limit"
-                className="max-w-[100px]"
-                value={limit}
-                onChange={(event) => setLimit(event.target.value)}
-              />
+            <div className="flex flex-col gap-3 mb-6 md:flex-row md:items-center">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Location ID"
+                  className="flex-1 md:max-w-[200px]"
+                  value={locationId}
+                  onChange={(event) => setLocationId(event.target.value)}
+                />
+                <Input
+                  placeholder="Limit"
+                  className="w-[80px]"
+                  value={limit}
+                  onChange={(event) => setLimit(event.target.value)}
+                />
+              </div>
               <div className="relative flex-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search contacts..."
-                  className="pl-8"
+                  className="pl-8 w-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Select value={tagFilter} onValueChange={setTagFilter}>
-                <SelectTrigger className="w-[170px]">
+                <SelectTrigger className="w-full md:w-[170px]">
                   <SelectValue placeholder="Filter by tag" />
                 </SelectTrigger>
                 <SelectContent>
@@ -271,7 +273,7 @@ export default function CRMPage() {
             </div>
 
             {filteredContacts.length > 0 ? (
-              <div className="rounded-md border">
+              <div className="rounded-md border w-full overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
