@@ -6,16 +6,19 @@ import {
   Copy,
   Download,
   FileText,
+  History,
   Mail,
   Megaphone,
   Mic,
   RefreshCcw,
+  Trash2,
   Wand2,
 } from "lucide-react";
-import { useAction } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import SideBar from "@/components/SideBar";
 import { PlanGate } from "@/components/PlanGate";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -122,6 +125,9 @@ export default function TranscriberPage() {
   const refineTranscriptAction = useAction(
     api.actions.refineTranscript.refineTranscript,
   );
+  const saveTranscript = useMutation(api.transcripts.create);
+  const deleteTranscript = useMutation(api.transcripts.remove);
+  const history = useQuery(api.transcripts.list, { limit: 25 });
 
   const [url, setUrl] = useState("");
   const [phase, setPhase] = useState<Phase>("input");
@@ -208,12 +214,31 @@ export default function TranscriberPage() {
       clearStepTimers();
       setActiveStep("done");
 
-      setTranscript(result.transcript ?? "");
+      const transcriptText = result.transcript ?? "";
+      setTranscript(transcriptText);
       setMetadata({
         duration: result.duration ?? undefined,
         language: result.language ?? null,
         words: Array.isArray(result.words) ? result.words.length : undefined,
       });
+
+      // Persist every successful transcription. Failures here shouldn't
+      // block the UI — the user already got their transcript.
+      if (transcriptText.trim()) {
+        const wc = transcriptText.trim().split(/\s+/).length;
+        saveTranscript({
+          sourceUrl: trimmed,
+          platform: detectedPlatform,
+          transcript: transcriptText,
+          duration: result.duration ?? 0,
+          language: result.language ?? undefined,
+          source: result.source ?? "unknown",
+          wordCount: wc,
+        }).catch((e) => {
+          console.warn("[transcriber] failed to save transcript", e);
+          toast.error("Transcript wasn't saved to history.");
+        });
+      }
 
       window.setTimeout(() => setPhase("result"), 450);
     } catch (err) {
@@ -254,6 +279,38 @@ export default function TranscriberPage() {
     setRefinedOutput("");
     setRefineError(null);
     setShowModePicker(true);
+  };
+
+  const openSavedTranscript = (row: {
+    sourceUrl: string;
+    transcript: string;
+    duration: number;
+    language?: string;
+    words?: unknown;
+  }) => {
+    setUrl(row.sourceUrl);
+    setTranscript(row.transcript);
+    setMetadata({
+      duration: row.duration,
+      language: row.language ?? null,
+      words: row.transcript.trim().split(/\s+/).length,
+    });
+    setError(null);
+    setRefinedOutput("");
+    setRefineError(null);
+    setSelectedMode(null);
+    setShowModePicker(true);
+    setPhase("result");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteSaved = async (id: Id<"transcripts">) => {
+    try {
+      await deleteTranscript({ id });
+      toast.success("Removed from history");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete");
+    }
   };
 
   const showInputForm = phase === "input";
@@ -575,6 +632,73 @@ export default function TranscriberPage() {
                 </Card>
               ) : null}
             </div>
+          ) : null}
+
+          {history && history.length > 0 ? (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-4 w-4 text-amber-400" />
+                  Recent transcriptions
+                </CardTitle>
+                <CardDescription>
+                  Every transcription is saved here automatically.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {history.map((row) => (
+                    <li
+                      key={row._id}
+                      className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] p-3 hover:border-amber-500/30 transition-colors"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openSavedTranscript(row)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm leading-none">
+                            {getPlatformEmoji(row.platform as Platform)}
+                          </span>
+                          <p className="text-sm font-medium text-foreground/90 truncate">
+                            {row.sourceUrl}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>{formatDuration(row.duration)}</span>
+                          <span>·</span>
+                          <span>{row.wordCount.toLocaleString()} words</span>
+                          {row.language ? (
+                            <>
+                              <span>·</span>
+                              <span className="uppercase">{row.language}</span>
+                            </>
+                          ) : null}
+                          <span>·</span>
+                          <span>
+                            {new Date(row.createdAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void handleDeleteSaved(row._id)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-400 shrink-0"
+                        aria-label="Delete from history"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           ) : null}
         </PlanGate>
       </div>

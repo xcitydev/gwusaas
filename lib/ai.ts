@@ -29,7 +29,6 @@ const GEMINI_FALLBACK_MODELS = [
   "gemini-2.0-flash",
   "gemini-2.0-flash-lite",
 ];
-let cachedGeminiModels: string[] | null = null;
 
 function parseProviderOrder(raw: string): AiProvider[] {
   const parsed = raw
@@ -88,25 +87,70 @@ function stripCodeFences(rawText: string): string {
     .trim();
 }
 
+/**
+ * Scan for the first balanced JSON object or array starting at the first
+ * `{` or `[`. Handles strings with escaped quotes so braces inside string
+ * values don't confuse the depth counter.
+ */
+function extractBalancedJson(text: string): string | null {
+  let start = -1;
+  let openChar: "{" | "[" | null = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "{" || c === "[") {
+      start = i;
+      openChar = c;
+      break;
+    }
+  }
+  if (start === -1 || !openChar) return null;
+  const closeChar = openChar === "{" ? "}" : "]";
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (inString) {
+      if (c === "\\") escape = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === openChar) depth++;
+    else if (c === closeChar) {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 function parseJsonFromText<T>(rawText: string): T {
   const sanitized = stripCodeFences(rawText);
   try {
     return JSON.parse(sanitized) as T;
   } catch {
-    const firstCurly = sanitized.indexOf("{");
-    const lastCurly = sanitized.lastIndexOf("}");
-    if (firstCurly !== -1 && lastCurly > firstCurly) {
-      const candidate = sanitized.slice(firstCurly, lastCurly + 1);
-      return JSON.parse(candidate) as T;
-    }
-    const firstBracket = sanitized.indexOf("[");
-    const lastBracket = sanitized.lastIndexOf("]");
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
-      const candidate = sanitized.slice(firstBracket, lastBracket + 1);
-      return JSON.parse(candidate) as T;
-    }
-    throw new Error("Model response did not contain parseable JSON");
+    // fall through to balanced-extraction attempt below
   }
+
+  const balanced = extractBalancedJson(sanitized);
+  if (balanced) {
+    try {
+      return JSON.parse(balanced) as T;
+    } catch {
+      // fall through
+    }
+  }
+
+  throw new Error("Model response did not contain parseable JSON");
 }
 
 function isModelNotFoundError(error: unknown): boolean {
@@ -132,50 +176,10 @@ function sanitizeGeminiModelName(name: string) {
   return name.replace(/^models\//, "").trim();
 }
 
-async function listAvailableGeminiModels() {
-  if (!geminiClient) return [];
-  if (cachedGeminiModels) return cachedGeminiModels;
-
-  try {
-    const result = await geminiClient.listModels();
-    const models = Array.isArray(result?.models) ? result.models : [];
-    const names = models
-      .filter((model) =>
-        Array.isArray(model?.supportedGenerationMethods) &&
-        model.supportedGenerationMethods.includes("generateContent"),
-      )
-      .map((model) => sanitizeGeminiModelName(String(model?.name || "")))
-      .filter(Boolean);
-    cachedGeminiModels = names;
-    return names;
-  } catch (error) {
-    console.warn("[AI] unable to list Gemini models, using static fallback", {
-      message: errorMessage(error),
-    });
-    return [];
-  }
-}
-
-function scoreGeminiModel(model: string) {
-  const normalized = model.toLowerCase();
-  if (normalized.includes("2.5") && normalized.includes("flash") && normalized.includes("lite")) return 95;
-  if (normalized.includes("2.5") && normalized.includes("flash")) return 100;
-  if (normalized.includes("2.0") && normalized.includes("flash") && normalized.includes("lite")) return 85;
-  if (normalized.includes("2.0") && normalized.includes("flash")) return 90;
-  if (normalized.includes("1.5") && normalized.includes("flash")) return 75;
-  if (normalized.includes("flash")) return 70;
-  if (normalized.includes("pro")) return 50;
-  return 10;
-}
-
-async function getGeminiModelsFromEnvOrFallback() {
+function getGeminiModelsFromEnvOrFallback(): string[] {
   const configured = getModelsFromEnvOrFallback("GEMINI_MODEL", GEMINI_FALLBACK_MODELS);
-  const discovered = await listAvailableGeminiModels();
-  const sortedDiscovered = [...discovered].sort(
-    (a, b) => scoreGeminiModel(b) - scoreGeminiModel(a),
-  );
   const seen = new Set<string>();
-  return [...configured, ...sortedDiscovered].filter((model) => {
+  return configured.filter((model) => {
     const normalized = sanitizeGeminiModelName(model);
     if (!normalized || seen.has(normalized)) return false;
     seen.add(normalized);
@@ -236,6 +240,7 @@ async function generateWithOpenAI(
         model,
         temperature: 0.3,
         max_tokens: maxTokens,
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
           { role: "user", content: `${userText}\n\nReturn valid JSON only.` },
@@ -261,7 +266,7 @@ async function generateWithGemini(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const models = await getGeminiModelsFromEnvOrFallback();
+  const models = getGeminiModelsFromEnvOrFallback();
   const prompt = `${buildUnifiedPrompt(system, messages)}\n\nReturn valid JSON only.`;
   let lastError: unknown;
 

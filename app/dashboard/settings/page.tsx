@@ -74,23 +74,25 @@ export default function SettingsPage() {
 
   return (
     <SideBar>
-      <div className="flex-1 space-y-4 p-6 md:p-8 pt-6 max-w-5xl mx-auto">
+      <div className="flex-1 min-w-0 space-y-4 p-4 sm:p-6 md:p-8 pt-6 max-w-5xl mx-auto">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage your organization settings and integrations
           </p>
         </div>
 
         <Tabs defaultValue="instagram" className="space-y-6">
-          <TabsList className="bg-white/5 border border-white/5 p-1 h-12">
-            <TabsTrigger value="instagram" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Instagram</TabsTrigger>
-            <TabsTrigger value="ghl" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">GoHighLevel</TabsTrigger>
-            <TabsTrigger value="voice" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Voice</TabsTrigger>
-            <TabsTrigger value="strategy" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Brand & Strategy</TabsTrigger>
-            <TabsTrigger value="services" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Service Requests</TabsTrigger>
-            <TabsTrigger value="team" className="px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Team</TabsTrigger>
-          </TabsList>
+          <div className="-mx-4 sm:mx-0 overflow-x-auto">
+            <TabsList className="bg-white/5 border border-white/5 p-1 h-12 mx-4 sm:mx-0 w-max sm:w-auto">
+              <TabsTrigger value="instagram" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Instagram</TabsTrigger>
+              <TabsTrigger value="ghl" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">GoHighLevel</TabsTrigger>
+              <TabsTrigger value="voice" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Voice</TabsTrigger>
+              <TabsTrigger value="strategy" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Brand &amp; Strategy</TabsTrigger>
+              <TabsTrigger value="services" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Service Requests</TabsTrigger>
+              <TabsTrigger value="team" className="px-3 sm:px-6 whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Team</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="instagram">
             <Card className="glass-card border-white/5 overflow-hidden">
@@ -100,7 +102,7 @@ export default function SettingsPage() {
                   Connect your Instagram account for official metrics via Meta Graph API
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-8 space-y-6">
+              <CardContent className="p-4 sm:p-6 md:p-8 space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="handle" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Instagram Handle</Label>
                   <Input

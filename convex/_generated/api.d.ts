@@ -40,6 +40,7 @@ import type * as scheduled from "../scheduled.js";
 import type * as scheduledFunctions from "../scheduledFunctions.js";
 import type * as settings from "../settings.js";
 import type * as support from "../support.js";
+import type * as transcripts from "../transcripts.js";
 import type * as usage from "../usage.js";
 import type * as userApiKeys from "../userApiKeys.js";
 import type * as users from "../users.js";
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   scheduledFunctions: typeof scheduledFunctions;
   settings: typeof settings;
   support: typeof support;
+  transcripts: typeof transcripts;
   usage: typeof usage;
   userApiKeys: typeof userApiKeys;
   users: typeof users;

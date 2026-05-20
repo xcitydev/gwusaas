@@ -837,4 +837,18 @@ export default defineSchema({
   })
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
+
+  transcripts: defineTable({
+    clerkUserId: v.string(),
+    sourceUrl: v.string(),
+    platform: v.string(), // "youtube" | "instagram" | "tiktok" | "facebook" | "direct" | "unknown"
+    transcript: v.string(),
+    duration: v.number(), // seconds
+    language: v.optional(v.string()),
+    source: v.string(), // which provider produced it (e.g. "youtube-captions", "assemblyai")
+    wordCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"]),
 });
