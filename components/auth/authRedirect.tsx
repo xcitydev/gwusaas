@@ -79,10 +79,10 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
         </div>
         <div className="text-center space-y-2">
           <p className="text-xs font-black text-primary uppercase tracking-[0.3em] animate-pulse">
-            {isProvisioningProfile ? "Initializing Protocol" : "Establishing Uplink"}
+            {isProvisioningProfile ? "Setting up your account" : "Loading your workspace"}
           </p>
           <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">
-            {isProvisioningProfile ? "Syncing Workspace Architectures" : "Verifying Clearance Credentials"}
+            {isProvisioningProfile ? "Almost ready…" : "Just a moment"}
           </p>
         </div>
       </div>

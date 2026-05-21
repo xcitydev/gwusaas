@@ -23,6 +23,7 @@ import {
   Mic,
 } from "lucide-react";
 import Link from "next/link";
+import { AutomationStatusBanner } from "@/components/automations/AutomationStatusBanner";
 
 type ConversationSummary = {
   id: string;
@@ -511,6 +512,8 @@ export default function ConversationsPage() {
                     </div>
                   </div>
                 </div>
+
+                <AutomationStatusBanner conversationId={selectedId} />
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {loadingMessages ? (

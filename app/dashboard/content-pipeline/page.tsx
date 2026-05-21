@@ -174,7 +174,7 @@ export default function ContentPlanPage() {
 
         {/* Step 1: Brand context */}
         <Card className="glass-card border-white/5 overflow-hidden">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle>Step 1 · Tell us about your brand</CardTitle>
             <CardDescription>Used to tune the caption tone. All optional.</CardDescription>
           </CardHeader>
@@ -211,7 +211,7 @@ export default function ContentPlanPage() {
 
         {/* Step 2: Upload */}
         <Card className="glass-card border-white/5 overflow-hidden">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle>Step 2 · Upload your content</CardTitle>
             <CardDescription>Photos and videos. Up to 25MB each.</CardDescription>
           </CardHeader>
@@ -339,7 +339,7 @@ export default function ContentPlanPage() {
 
         {/* Past plans */}
         <Card className="glass-card border-white/5 overflow-hidden">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle>Past plans</CardTitle>
             <CardDescription>Open any plan to view, copy, or schedule.</CardDescription>
           </CardHeader>

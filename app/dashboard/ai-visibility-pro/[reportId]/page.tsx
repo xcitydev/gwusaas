@@ -116,7 +116,7 @@ export default function ReportPage({ params }: { params: Promise<{ reportId: str
 
         {/* Visibility Score */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle className="flex items-center gap-2">
               <Star className="w-5 h-5 text-primary" />
               Your AI Visibility Score
@@ -138,7 +138,7 @@ export default function ReportPage({ params }: { params: Promise<{ reportId: str
 
         {/* Queries + Content Blocks */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
               High-Intent AI Queries ({result.queries.length})
@@ -186,7 +186,7 @@ export default function ReportPage({ params }: { params: Promise<{ reportId: str
 
         {/* Authority Layer */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle className="flex items-center gap-2">
               <ListChecks className="w-5 h-5 text-primary" />
               Brand Authority Layer
@@ -201,7 +201,7 @@ export default function ReportPage({ params }: { params: Promise<{ reportId: str
 
         {/* FAQs */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle>FAQs</CardTitle>
             <CardDescription>Add these to your site for better AI visibility.</CardDescription>
           </CardHeader>
@@ -217,7 +217,7 @@ export default function ReportPage({ params }: { params: Promise<{ reportId: str
 
         {/* External Signals */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-primary" />
               External Signals

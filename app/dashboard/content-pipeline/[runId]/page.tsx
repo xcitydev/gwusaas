@@ -179,7 +179,7 @@ Hashtags: ${(d.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).joi
                   key={d.day}
                   className="glass-card border-white/5 overflow-hidden"
                 >
-                  <CardHeader className="border-b border-white/5 bg-white/5">
+                  <CardHeader className="border-b border-white/5">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <CardTitle className="text-lg flex items-center gap-3">
                         <span className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black flex items-center justify-center">

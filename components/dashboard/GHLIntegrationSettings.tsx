@@ -100,7 +100,7 @@ export function GHLIntegrationSettings() {
   if (loadingStatus) {
     return (
       <Card className="glass-card border-white/5 overflow-hidden">
-        <CardHeader className="border-b border-white/5 bg-white/5">
+        <CardHeader className="border-b border-white/5">
           <CardTitle>GoHighLevel Integration</CardTitle>
           <CardDescription>Loading connection status…</CardDescription>
         </CardHeader>
@@ -114,7 +114,7 @@ export function GHLIntegrationSettings() {
   if (status?.isActive) {
     return (
       <Card className="glass-card border-white/5 overflow-hidden">
-        <CardHeader className="border-b border-white/5 bg-white/5">
+        <CardHeader className="border-b border-white/5">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>GoHighLevel Integration</CardTitle>
@@ -202,7 +202,7 @@ export function GHLIntegrationSettings() {
 
   return (
     <Card className="glass-card border-white/5 overflow-hidden">
-      <CardHeader className="border-b border-white/5 bg-white/5">
+      <CardHeader className="border-b border-white/5">
         <CardTitle>GoHighLevel Integration</CardTitle>
         <CardDescription>
           Connect your GoHighLevel sub-account to sync contacts, pipelines, and

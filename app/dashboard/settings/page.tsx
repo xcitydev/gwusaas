@@ -96,7 +96,7 @@ export default function SettingsPage() {
 
           <TabsContent value="instagram">
             <Card className="glass-card border-white/5 overflow-hidden">
-              <CardHeader className="border-b border-white/5 bg-white/5">
+              <CardHeader className="border-b border-white/5">
                 <CardTitle>Instagram Connection</CardTitle>
                 <CardDescription>
                   Connect your Instagram account for official metrics via Meta Graph API

@@ -290,7 +290,7 @@ export function ServiceFormsSettings({
   if (!selected) {
     return (
       <Card className="glass-card border-white/5 overflow-hidden">
-        <CardHeader className="border-b border-white/5 bg-white/5">
+        <CardHeader className="border-b border-white/5">
           <CardTitle>{title ?? "Request a Service"}</CardTitle>
           <CardDescription>
             {description ?? "Tell us what you need — we'll handle it."}
@@ -331,7 +331,7 @@ export function ServiceFormsSettings({
 
   return (
     <Card className="glass-card border-white/5 overflow-hidden">
-      <CardHeader className="border-b border-white/5 bg-white/5">
+      <CardHeader className="border-b border-white/5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <CardTitle>{titleMap[selected]}</CardTitle>

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { generateJsonWithFallback, getAiErrorMessage } from "@/lib/ai";
 import { requirePlan } from "@/lib/route-auth";
 import { scrapeUrl } from "@/lib/firecrawl";
-import { saveAiGenerationHistory } from "@/lib/convex-history";
+import { saveAiGenerationHistory, saveProspectLeads } from "@/lib/convex-history";
 
 const bodySchema = z.object({
   url: z.string().url(),
@@ -257,15 +257,49 @@ export async function POST(req: Request) {
       };
     });
 
+    // Persist to the user's prospect-leads library. Map scrape's
+    // contactName/contactRole onto the unified shape.
+    let savedCount = 0;
+    if (leads.length > 0) {
+      try {
+        const result = (await saveProspectLeads({
+          clerkUserId: guard.userId,
+          source: "scrape",
+          sourceQuery: parsed.data.url,
+          leads: leads.map((l) => ({
+            name: l.contactName,
+            email: l.email,
+            phone: l.phone,
+            company: l.company,
+            jobTitle: l.contactRole,
+            industry: "",
+            location: l.location,
+            linkedin: l.linkedin,
+            website: l.website,
+            painPoint: l.painPoint,
+            outreachAngle: l.outreachAngle,
+            confidence: l.confidence,
+          })),
+        })) as { inserted?: number };
+        savedCount = result?.inserted ?? 0;
+      } catch (saveErr) {
+        console.warn("[lead-gen/scrape] failed to save prospect leads", {
+          traceId,
+          message: saveErr instanceof Error ? saveErr.message : String(saveErr),
+        });
+      }
+    }
+
     console.info("Lead scrape extracted", {
       traceId,
       provider,
       model,
       selectedActor,
+      savedCount,
       rawPreview: rawText.slice(0, 300),
     });
 
-    return NextResponse.json({ leads, generationId, selectedActor });
+    return NextResponse.json({ leads, generationId, selectedActor, savedCount });
   } catch (error) {
     console.error("Lead scrape failed", error);
     return NextResponse.json(

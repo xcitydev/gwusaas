@@ -30,13 +30,12 @@ import {
   Layers
 } from "lucide-react";
 
+// Service-hub tiles on the dashboard only render for categories with a
+// live destination. Add a route here to expose a category; remove to hide it.
 const CATEGORY_HREF: Record<string, string> = {
-  Advertising: "/dashboard/ads",
   "Email & SMS": "/dashboard/email",
   SEO: "/dashboard/seo",
   Content: "/dashboard/content",
-  "Social Growth": "/dashboard/social",
-  Other: "/dashboard/community",
 };
 
 const container = {
@@ -66,6 +65,7 @@ export default function DashboardPage() {
     | { dmsSent: number; replies: number; callsBooked: number; dealsClosed: number }
     | null
     | undefined;
+  const alerts = useQuery(api.dashboardAlerts.get, user?.id ? {} : "skip");
 
   if (!isLoaded) {
     return (
@@ -167,9 +167,11 @@ export default function DashboardPage() {
           <motion.div variants={item} className="md:col-span-12">
             <div className="p-1">
               <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground/50 mb-4 px-2">Service Hubs</h3>
-              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-                {Object.entries(categoryCounts).map(([category, count]) => (
-                  <Link key={category} href={CATEGORY_HREF[category] ?? "/dashboard"} className="group">
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+                {Object.entries(categoryCounts)
+                  .filter(([category]) => Boolean(CATEGORY_HREF[category]))
+                  .map(([category, count]) => (
+                  <Link key={category} href={CATEGORY_HREF[category]} className="group">
                     <Card className="h-full glass-card rounded-2xl border-white/5 transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-white/10">
                       <CardHeader className="p-5 pb-2">
                         <div className="flex justify-between items-start mb-2">
@@ -201,13 +203,7 @@ export default function DashboardPage() {
 
           <motion.div variants={item} className="md:col-span-6 lg:col-span-5">
             <div className="glass-card rounded-[2rem] h-full p-2">
-              <NeedsAttention
-                items={[
-                  "Unanswered high-intent replies (Action Required)",
-                  "Deals stuck in 'Negotiation' stage for 3+ days",
-                  "Campaign '@LuxuryLeads' hitting rate limits",
-                ]}
-              />
+              <NeedsAttention alerts={alerts} loading={alerts === undefined} />
             </div>
           </motion.div>
 

@@ -28,6 +28,7 @@ import {
   Users,
   WalletCards,
   CreditCard,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,7 @@ const agencyNav: NavSection[] = [
       { label: "Get New Customers", href: "/dashboard/outreach", icon: MessageSquare, requiredPlan: "growth" },
       { label: "Sales", href: "/dashboard/deals", icon: WalletCards, requiredPlan: "growth" },
       { label: "Find Leads", href: "/dashboard/scraper", icon: Search, requiredPlan: "growth" },
+      { label: "Automations", href: "/dashboard/automations", icon: Zap, requiredPlan: "growth" },
     ],
   },
   {
@@ -112,6 +114,7 @@ const directClientNav: NavSection[] = [
       { label: "Inbox", href: "/dashboard/conversations", icon: Inbox, requiredPlan: "free" },
       { label: "Get New Customers", href: "/dashboard/outreach", icon: MessageSquare, requiredPlan: "starter" },
       { label: "Sales", href: "/dashboard/deals", icon: WalletCards, requiredPlan: "starter" },
+      { label: "Automations", href: "/dashboard/automations", icon: Zap, requiredPlan: "growth" },
     ],
   },
   {

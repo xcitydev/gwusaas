@@ -166,7 +166,7 @@ export function VoiceReplySettings() {
   return (
     <div className="space-y-6">
       <Card className="glass-card border-white/5 overflow-hidden">
-        <CardHeader className="border-b border-white/5 bg-white/5">
+        <CardHeader className="border-b border-white/5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -256,7 +256,7 @@ export function VoiceReplySettings() {
       </Card>
 
       <Card className="glass-card border-white/5 overflow-hidden">
-        <CardHeader className="border-b border-white/5 bg-white/5">
+        <CardHeader className="border-b border-white/5">
           <CardTitle>
             {voiceClone ? "Replace your voice" : "Clone your voice"}
           </CardTitle>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateJsonWithFallback, getAiErrorMessage } from "@/lib/ai";
 import { requirePlan } from "@/lib/route-auth";
-import { saveAiGenerationHistory } from "@/lib/convex-history";
+import { saveAiGenerationHistory, saveProspectLeads } from "@/lib/convex-history";
 
 const bodySchema = z.object({
   query: z.string().min(1),
@@ -129,15 +129,37 @@ export async function POST(req: Request) {
       output: leads,
     });
 
+    // Persist to the user's prospect-leads library so other surfaces
+    // (voice caller, email/SMS sequences) can pick from them. Don't block
+    // the response on save failure — the user already has their results.
+    let savedCount = 0;
+    if (leads.length > 0) {
+      try {
+        const result = (await saveProspectLeads({
+          clerkUserId: guard.userId,
+          source: "vibe",
+          sourceQuery: query,
+          leads,
+        })) as { inserted?: number };
+        savedCount = result?.inserted ?? 0;
+      } catch (saveErr) {
+        console.warn("[lead-gen/vibe] failed to save prospect leads", {
+          traceId,
+          message: saveErr instanceof Error ? saveErr.message : String(saveErr),
+        });
+      }
+    }
+
     console.info("Vibe prospect search completed", {
       traceId,
       provider,
       model,
       count: leads.length,
+      savedCount,
       rawPreview: rawText.slice(0, 200),
     });
 
-    return NextResponse.json({ leads, generationId, source: "vibe" });
+    return NextResponse.json({ leads, generationId, savedCount, source: "vibe" });
   } catch (error) {
     console.error("Vibe prospect search failed", error);
     return NextResponse.json(

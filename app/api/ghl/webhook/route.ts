@@ -1,12 +1,39 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { isFreshWebhookEvent } from "@/lib/webhookIdempotency";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@/convex/_generated/api";
+import {
+  dispatchAutomation,
+  type DispatchInput,
+} from "@/lib/automations/dispatcher";
 
 type WebhookPayload = {
   type?: string;
   eventType?: string;
   [key: string]: unknown;
 };
+
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+const convex = convexUrl ? new ConvexHttpClient(convexUrl) : null;
+
+/**
+ * Maps GHL message-type strings to our internal channel enum used by
+ * automation rules. Returns null for types we don't yet auto-reply on
+ * (so the rule never fires for, e.g., voice notes).
+ */
+function mapGhlMessageType(
+  messageType: string | undefined,
+): DispatchInput["channel"] | null {
+  if (!messageType) return null;
+  const t = messageType.toUpperCase();
+  if (t.includes("INSTAGRAM") || t === "IG" || t === "TYPE_INSTAGRAM") return "instagram";
+  if (t.includes("SMS") || t === "TYPE_SMS") return "sms";
+  if (t.includes("EMAIL") || t === "TYPE_EMAIL") return "email";
+  if (t.includes("FACEBOOK") || t === "FB" || t === "TYPE_FB") return "facebook";
+  if (t.includes("WHATSAPP") || t === "TYPE_WHATSAPP") return "whatsapp";
+  return null;
+}
 
 /**
  * Receives inbound webhook events from GoHighLevel.
@@ -54,6 +81,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ success: true, deduped: true });
     }
 
+    let dispatchOutcome: string | undefined;
+
     switch (eventType) {
       case "ContactCreated":
         // TODO: Add business logic for ContactCreated.
@@ -61,12 +90,63 @@ export async function POST(request: Request): Promise<NextResponse> {
       case "OpportunityStageChanged":
         // TODO: Add business logic for OpportunityStageChanged.
         break;
+      case "InboundMessage": {
+        // Auto-reply dispatcher: only inbound (lead-to-us) messages.
+        const direction = String(payload.direction ?? "");
+        if (direction && direction !== "inbound") break;
+
+        const locationId = String(payload.locationId ?? "");
+        const conversationId = String(payload.conversationId ?? "");
+        const body = String(payload.body ?? payload.message ?? "");
+        const messageType = String(payload.messageType ?? payload.type ?? "");
+        const contactLabel =
+          typeof payload.contactName === "string"
+            ? payload.contactName
+            : typeof payload.contactEmail === "string"
+              ? payload.contactEmail
+              : undefined;
+        const channel = mapGhlMessageType(messageType);
+
+        if (!locationId || !conversationId || !body.trim() || !channel || !convex) {
+          dispatchOutcome = "skipped:missing_fields";
+          break;
+        }
+
+        const clerkUserId = (await convex.query(
+          api.automations.findUserByLocationId,
+          { locationId },
+        )) as string | null;
+        if (!clerkUserId) {
+          dispatchOutcome = "skipped:unknown_location";
+          break;
+        }
+
+        const result = await dispatchAutomation({
+          clerkUserId,
+          conversationId,
+          channel,
+          messageBody: body,
+          contactLabel,
+        });
+        dispatchOutcome = result.kind;
+        if (result.kind === "error") {
+          console.warn("[ghl/webhook] automation dispatch failed", {
+            conversationId,
+            channel,
+            message: result.message,
+          });
+        }
+        break;
+      }
       default:
         // TODO: Add business logic for other webhook event types.
         break;
     }
 
-    return NextResponse.json({ success: true, data: { eventType } });
+    return NextResponse.json({
+      success: true,
+      data: { eventType, automation: dispatchOutcome },
+    });
   } catch (error) {
     console.error("GHL webhook route failed", error);
     return NextResponse.json(

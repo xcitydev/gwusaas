@@ -103,7 +103,7 @@ export default function AiVisibilityProPage() {
 
         {/* Generate Form */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle className="flex items-center gap-2">
               <Search className="w-5 h-5 text-primary" />
               Run a New Visibility Check
@@ -181,7 +181,7 @@ export default function AiVisibilityProPage() {
 
         {/* Report History */}
         <Card className="glass-card border-white/5 overflow-hidden shadow-card">
-          <CardHeader className="border-b border-white/5 bg-white/5">
+          <CardHeader className="border-b border-white/5">
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" />
               My Past Checks

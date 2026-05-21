@@ -914,4 +914,140 @@ export default defineSchema({
     .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_provider_id", ["provider", "providerId"])
     .index("by_template_id", ["templateId"]),
+
+  // User-defined automation rules. When a matching inbound message arrives,
+  // the runAutomation action either drafts a reply for approval (approval
+  // mode) or sends it directly (autonomous mode). Persona/goal drive the AI
+  // tone. Channels filter which inbound conversations the rule matches.
+  automations: defineTable({
+    clerkUserId: v.string(),
+    name: v.string(),
+    status: v.string(), // "active" | "paused"
+    mode: v.string(), // "approval" | "autonomous"
+    // Trigger spec: for MVP only "keyword" (case-insensitive contains).
+    // Future: "regex" | "ai-intent".
+    triggerType: v.string(),
+    triggerValue: v.string(),
+    // Channels the rule applies to. Subset of:
+    // "instagram" | "sms" | "email" | "facebook" | "whatsapp"
+    channels: v.array(v.string()),
+    // System-prompt addition that gives the AI its personality + goal.
+    persona: v.string(),
+    goal: v.string(), // "book-call" | "qualify" | "send-pricing" | "custom"
+    // Hard caps so the AI can't run away on cost or annoy a lead.
+    maxRepliesPerThread: v.number(),
+    // If true, the very first AI message in a thread gets prefixed with a
+    // disclosure line ("Hey, this is {user}'s AI assistant…").
+    disclaimerRequired: v.boolean(),
+    // Should the automation create a deal in the automationDeals pipeline?
+    autoCreateDeal: v.boolean(),
+    defaultDealValue: v.optional(v.number()),
+    // Tally for the automations page (lifetime counts).
+    totalRepliesSent: v.number(),
+    totalRunsStarted: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastTriggeredAt: v.optional(v.number()),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_status", ["clerkUserId", "status"]),
+
+  // One row per conversation thread an automation is handling. Lets us cap
+  // replies per thread, detect manual take-overs, and show the "🤖 Auto-
+  // replying" badge in the inbox.
+  automationRuns: defineTable({
+    clerkUserId: v.string(),
+    automationId: v.id("automations"),
+    conversationId: v.string(), // GHL conversation id
+    channel: v.string(),
+    status: v.string(), // "running" | "paused" | "completed" | "stopped"
+    stage: v.string(), // "contacted" | "replied" | "call-booked" | "call-done" | "proposal-sent" | "closed-won" | "closed-lost"
+    replyCount: v.number(),
+    // Drafts that haven't been approved yet (approval mode). Cleared on
+    // send or discard.
+    pendingDraftId: v.optional(v.id("automationDrafts")),
+    lastReplyAt: v.optional(v.number()),
+    lastInboundAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    stoppedReason: v.optional(v.string()),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_automation_id", ["automationId"])
+    .index("by_clerk_user_id_status", ["clerkUserId", "status"]),
+
+  // Approval-mode drafts. The AI populates these; the user reviews + sends
+  // (or discards) from the inbox. In autonomous mode this row is created
+  // and immediately marked "sent" once the GHL send succeeds.
+  automationDrafts: defineTable({
+    clerkUserId: v.string(),
+    runId: v.id("automationRuns"),
+    automationId: v.id("automations"),
+    conversationId: v.string(),
+    channel: v.string(),
+    body: v.string(),
+    intent: v.optional(v.string()),
+    reasoning: v.optional(v.string()),
+    status: v.string(), // "pending" | "sent" | "discarded" | "failed"
+    provider: v.optional(v.string()),
+    model: v.optional(v.string()),
+    sentAt: v.optional(v.number()),
+    sentMessageId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_run_id", ["runId"])
+    .index("by_conversation_id_status", ["conversationId", "status"]),
+
+  // Lightweight deal pipeline owned by automations. Surfaces in the
+  // automations page; intentionally separate from the existing `deals`
+  // table (which is bound to dmContacts + dmCampaigns) so we don't
+  // contaminate the legacy DM pipeline.
+  automationDeals: defineTable({
+    clerkUserId: v.string(),
+    automationId: v.id("automations"),
+    runId: v.id("automationRuns"),
+    conversationId: v.string(),
+    contactLabel: v.string(), // GHL contact name or handle, for display
+    stage: v.string(),
+    dealValue: v.optional(v.number()),
+    currency: v.string(),
+    notes: v.optional(v.string()),
+    closedAt: v.optional(v.number()),
+    lostReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_stage", ["clerkUserId", "stage"])
+    .index("by_run_id", ["runId"]),
+
+  // Rich B2B prospect leads pulled from the lead-gen tools (Vibe, scraper,
+  // manual). Owned per user, dedupe by (clerkUserId, emailLower). Consumed
+  // by voice-caller campaigns, email sequences, SMS sequences, etc.
+  prospectLeads: defineTable({
+    clerkUserId: v.string(),
+    name: v.string(),
+    email: v.string(),
+    emailLower: v.string(), // normalized for dedupe
+    phone: v.string(),
+    company: v.string(),
+    jobTitle: v.string(),
+    industry: v.string(),
+    location: v.string(),
+    linkedin: v.string(),
+    website: v.string(),
+    painPoint: v.string(),
+    outreachAngle: v.string(),
+    confidence: v.number(),
+    source: v.string(), // "vibe" | "scrape" | "manual" | "import"
+    sourceQuery: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+  })
+    .index("by_clerk_user_id", ["clerkUserId"])
+    .index("by_clerk_user_id_created_at", ["clerkUserId", "createdAt"])
+    .index("by_user_and_email", ["clerkUserId", "emailLower"]),
 });

@@ -46,3 +46,32 @@ export async function saveAiGenerationHistory(args: SaveAiGenerationArgs) {
     args as Record<string, unknown>,
   );
 }
+
+type ProspectLead = {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  jobTitle: string;
+  industry: string;
+  location: string;
+  linkedin: string;
+  website: string;
+  painPoint: string;
+  outreachAngle: string;
+  confidence: number;
+};
+
+type SaveProspectLeadsArgs = {
+  clerkUserId: string;
+  source: string; // "vibe" | "scrape" | "manual"
+  sourceQuery?: string;
+  leads: ProspectLead[];
+};
+
+export async function saveProspectLeads(args: SaveProspectLeadsArgs) {
+  return runMutation(
+    "prospectLeads:saveBatch",
+    args as unknown as Record<string, unknown>,
+  );
+}

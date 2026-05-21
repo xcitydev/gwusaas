@@ -77,7 +77,7 @@ export function SavedTemplatesLibrary() {
 
   return (
     <Card className="glass-card border-white/5 overflow-hidden">
-      <CardHeader className="border-b border-white/5 bg-white/5">
+      <CardHeader className="border-b border-white/5">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
